@@ -1,0 +1,14 @@
+# Ignore R project files 
+.RData 
+.Rhistory 
+.Rproj.user/ 
+2PERSON_Crossection.Rproj
+
+# Rendered reports 
+*.html
+*.pdf
+*.pptx
+
+# Directories 
+data/
+out/ 

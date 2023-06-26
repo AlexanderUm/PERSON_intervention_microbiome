@@ -1,0 +1,879 @@
+---
+title: "PERSON Intervention effects"
+author: "A. Umanets"
+date: '2023-05-08'
+output: html_document
+---
+
+\
+**Primary aim:** intervention effects on gut microbiome \
+**Secondary aim:** baseline prediction for diet induces changes in metabolic markers \
+\
+
+### Plan
+
+#### I. Differences in microbiome between T0 and T1
+
+\
+**1. Change in alpha diversity between T0 and T1** \
+[DONE] 1.0. Baseline: T0 between diets with disregard to phenotype.
+[DONE] 1.1. Pairwise test per subgroup (phenotype_diet) \
+[DONE] 1.2. Pairwise test per diet disregarding phenotype (diet) \
+[DONE] 1.3. Pairwise test per phenotype disregarding diet (phenotype) \
+[DONE] 1.4. GLM as complete model \
+            "alpha ~ sex + age + place + Phenotype*Diet*Group + (1|Participant)" \
+\
+\
+**2. Change in bacteria composition between T0 and T1** \
+Normalization: CSS, rarefaction. \
+Level: ASV, Genus. \
+Analysis: \
+[DONE] 2.0.1. Baseline: T0 dist ~ sex + age + place + Phenotype*Diet \
+[DONE] 2.0.2. Baseline: T1 dist ~ sex + age + place + Phenotype*Diet \
+[DONE] 2.1.1 Complete model: \
+"dist ~ Participant_ID + sex + age + place + Phenotype*Diet*Group" \
+\
+[DONE] 2.1.2 Complete model: without random effect \
+"dist ~ sex + age + place + Phenotype*Diet*Group" \
+\
+[DONE] 2.2.1 Phenotype/diet stratified: \
+"dist ~ Participant_ID + sex + age + place + Group" \
+\
+[DONE] 2.2.2 Phenotype/diet stratified: \
+"dist ~ sex + age + place + Group" \
+\
+\
+**3. DA of taxa between T0 and T1** \
+[DONE] 3.1. Phenotype/diet stratified: (MaAsLin) term - Group, random effect - Participant \
+[DONE] 3.2. Phenotype/diet stratified: Paired Wilcox by Group. Normalization CSS & Rarefaction. 
+
+
+#### II. Correlation between base microbiome (T0) and change in metabolic parameters.
+
+\
+**1. Paired correlation**
+Concept: Correlated ASVs/Genera at T0 with change in metabolic parameters (delta)
+between T0 and T1. \
+Normalization: CSS & Rarefaction \
+Correlation: Spearman \
+\
+\
+**2. Correlation of overall microbial composition and change in metabolic parameters (delta)** \
+Normalization: CSS & rare \
+Taxonomic levels: ASV & Genera \
+[DONE] 2.1. PERMANOVA: The changes in metabolic parameters (delta) as constitutes terms of the
+model: \
+"dist ~ delta_metab_1..." \
+\
+\
+```{r , message=FALSE, warning=FALSE, prompt=FALSE, results='hide', echo=FALSE}
+#-------------------------------------------------------------------------------
+# Load libraries and set the environment 
+#-------------------------------------------------------------------------------
+set.seed(549794)
+
+# Load libraries 
+libs.list <- c("tidyverse", "metagenomeSeq", "qiime2R", "readxl", "phyloseq", 
+               "broom", "ggsignif", "lme4", "vegan", "knitr", "Maaslin2", 
+               "ComplexHeatmap")
+
+for (i in libs.list) {library(i, character.only = TRUE)}
+
+rm(list = c("i", "libs.list"))
+```
+
+
+```{r , message=FALSE, warning=FALSE, prompt=FALSE, results='hide', echo=FALSE}
+#-------------------------------------------------------------------------------
+# Read data/ Create phyloseq
+#-------------------------------------------------------------------------------
+ps1 <- qza_to_phyloseq(features = "data/asv_table.qza",
+                       tree = "data/rooted-tree.qza",
+                       taxonomy = "data/taxonomy_07.qza")
+
+#-------------------------------------------------------------------------------
+# Other data
+#-------------------------------------------------------------------------------
+ps1.meta <- read.csv("data/PERSON_intervention_meta.csv")
+
+rownames(ps1.meta) <- ps1.meta$SeqID
+
+# Pre-selected columns 
+col.sel.vec2 <- c("SeqID", "PartUniq_ID", "ID", "sc_phenotype", 
+                  "sc_phenotype_MIRLIR", "CIW", "d_CIW2","center", 
+                  "center_name",	"diet",	"diet_optimal",	"diet_name",
+                  "sex",	"dropout", "sc_age", "end_med_study.Antibiotics", 
+                  "weight", "hfmm_tag_0", "HOMA_IR", "Matsuda", "misi", 
+                  "CRP", "log10_misi", "log10_HOMA_IR",	"log10_Matsuda",   
+                  "log10_hfmm_tag_0", "log10_CRP")
+
+ps1.meta <- ps1.meta %>% 
+                dplyr::select(col.sel.vec2) %>% 
+                mutate(phenotype_diet = paste0(sc_phenotype_MIRLIR, "_", 
+                                               diet_name), 
+                       Time_point = paste0("T", CIW))
+
+# Select only relevant columns and add to the phyloseq
+sample_data(ps1) <- ps1.meta
+```
+
+
+```{r , message=FALSE, warning=FALSE, prompt=FALSE, results='hide', echo=FALSE}
+################################################################################
+# Filtering
+################################################################################
+#-------------------------------------------------------------------------------
+# Initial ASV filtering 
+#-------------------------------------------------------------------------------
+# filter taxa with with less than 10 reads in total   
+ps1 <- prune_taxa(taxa_sums(ps1) > 10, ps1)
+
+# Remove ASVs: 
+# Kingdom: "d__Eukaryota", "Unassigned"
+# Genus: "Mitochondria"
+ps1 <- prune_taxa(!tax_table(ps1)[, "Genus"] %in% "Mitochondria", ps1)
+
+ps1 <- prune_taxa(!tax_table(ps1)[, "Kingdom"] %in% c("d__Eukaryota", "Unassigned"), 
+                      ps1)
+
+# Change ASV IDs to shortened taxonomic names 
+source("R/phy_shorten_tax_names.R")
+
+taxa_names(ps1) <- make.unique(phy_shorten_tax_names(ps1))
+
+#-------------------------------------------------------------------------------
+# Samples
+#-------------------------------------------------------------------------------
+# Remove participants that used antibiotics (T0 and T1)
+ant.ids <- ps1.meta$ID[ps1.meta$end_med_study.Antibiotics != "0"] 
+
+ps1.f1 <- prune_samples(!ps1.meta$ID %in% ant.ids, ps1)
+
+ps1.f1.meta <- ps1.f1 %>% 
+                  sample_data() %>% 
+                  as.matrix() %>% 
+                  as.data.frame()
+```
+
+
+```{r , message=FALSE, warning=FALSE, results='hide', echo=FALSE}
+################################################################################
+# Alpha diversity
+################################################################################
+#-------------------------------------------------------------------------------
+# Prepare data and calculate alpha diversity
+#-------------------------------------------------------------------------------
+# Rarefy samples count 
+ps1.rare <- rarefy_even_depth(ps1.f1, rngseed = 4067937)
+
+# Calculate diversity indexes 
+alpha.df <- estimate_richness(physeq = ps1.rare, 
+                  measures = c("Observed", "Shannon", "InvSimpson"))
+
+# Calculate Phylogeny Diversity (package "picante")
+alpha.df$PhyloDiverity <- picante::pd(samp = t(otu_table(ps1.rare)), 
+                                       tree = phy_tree(ps1.rare), 
+                                       include.root = FALSE) |>
+                          dplyr::select("PD") |> 
+                          unlist()
+
+
+# Select relevant columns & and convert to long format
+alpha.col <- c("sc_phenotype_MIRLIR", "Time_point", "center_name", "ID", "sex",
+                                     "diet_name", "sc_age", "phenotype_diet")
+
+alpha.df.long <- ps1.f1.meta %>%
+                    dplyr::select(alpha.col) %>% 
+                    bind_cols(alpha.df)  %>% 
+                    gather(key = "Diversity_Index", 
+                           value = "Value", 
+                           -all_of(alpha.col)) %>% 
+                    mutate(sc_age = as.numeric(sc_age))
+
+
+#-------------------------------------------------------------------------------
+# 1.0. Baseline: T0 between diets with disregard to phenotype.
+#-------------------------------------------------------------------------------
+# Wilcox test 
+# Select only T1 samples
+alpha.1.0 <- alpha.df.long[alpha.df.long$Time_point == "T1", ]
+
+wil.res.alpha.1.0 <- NULL
+
+wil.formula <- paste0("Value ~ ", "diet_name")
+
+for (i in unique(alpha.1.0[, "Diversity_Index"])) {
+  
+  res.wil <- alpha.1.0 %>% 
+                filter(Diversity_Index == i) %>% 
+                wilcox.test(as.formula(wil.formula), .) %>% 
+                tidy() %>% 
+                mutate(Index = i)
+  
+  wil.res.alpha.1.0 <- bind_rows(wil.res.alpha.1.0, res.wil)
+  
+}
+
+
+#-------------------------------------------------------------------------------
+# 1.1. Pairwise test per subgroup (phenotype_diet) & 
+# 1.2. Pairwise test per diet disregarding phenotype (diet) &
+# 1.3. Pairwise test per phenotype disregarding diet (phenotype) 
+#-------------------------------------------------------------------------------
+# Variables 
+subcols <- c("phenotype_diet", "diet_name", "sc_phenotype_MIRLIR")
+
+alpha.plots.ls <- list()
+
+alpha.stat.ls <- list()
+
+wil.formula <- paste0("Value ~ ", "Time_point")
+
+
+# Test in a loop 
+for (sub.gr.col in subcols) {
+  
+  # Stat test
+  #-----------
+  test.res <- NULL
+  
+  for (i1 in unique(alpha.df.long[, sub.gr.col])) {
+  
+    for (i2 in unique(alpha.df.long[, "Diversity_Index"])) {
+      
+      res.wil <- alpha.df.long %>% 
+                    filter(get(sub.gr.col) == i1, 
+                           Diversity_Index == i2) %>% 
+                    arrange(Time_point, ID) %>% 
+                    wilcox.test(as.formula(wil.formula), ., paired = TRUE) %>% 
+                    tidy() %>% 
+                    mutate(!!sub.gr.col := i1, 
+                           Diversity_Index = i2)
+      
+      test.res <- bind_rows(test.res, res.wil)
+    
+    }
+  
+  }
+  
+  alpha.stat.ls[[sub.gr.col]] <- test.res
+  
+  
+  # Plot data
+  #----------
+  # Make data frame for significance levels 
+  max.div <- alpha.df.long %>% 
+                group_by(Diversity_Index, get(sub.gr.col)) %>% 
+                slice(which.max(Value)) %>% 
+                mutate(y.adj = (Value + Value*0.1), 
+                       comp_id = paste0(Diversity_Index, "_", get(sub.gr.col)))
+  
+  sig.df <- test.res %>% 
+              mutate(comp_id = paste0(Diversity_Index, "_", get(sub.gr.col)), 
+                     p.short = paste0("p=", round(p.value, 3)), 
+                     Start = unique(ps1.f1.meta$Time_point)[1], 
+                     End = unique(ps1.f1.meta$Time_point)[2]) %>% 
+              filter(p.value <= 0.1) %>% 
+              select(-all_of(c("Diversity_Index", sub.gr.col))) %>% 
+              left_join(., max.div, by = "comp_id")
+  
+  
+  # Plot alpha diversity 
+  alpha.plot <- ggplot(alpha.df.long, aes_string(y = "Value", 
+                                                 x = "Time_point")) + 
+                    geom_jitter(size = 2, 
+                                alpha = 0.5, width = 0.25, height = 0) +
+                    geom_boxplot(fill = "black", alpha = 0.1, outlier.colour = NA) +
+                    geom_signif(data = sig.df,
+                                aes(xmin = Start,
+                                    xmax = End,
+                                    annotations = p.short,
+                                    y_position = y.adj),
+                                textsize = 4, vjust = -0.1,
+                                manual = TRUE, margin_top = 1) +
+                    geom_point(data = sig.df,
+                                aes(x = End, y = y.adj*1.1), x=NA) +
+                    facet_grid(c("Diversity_Index", sub.gr.col), 
+                                      scales = "free") + 
+                    theme_bw() + 
+                   # scale_color_manual(values = col.gr) + 
+                    theme(legend.position = "none")
+  
+  alpha.plots.ls[[sub.gr.col]] <- alpha.plot
+
+}
+
+#-------------------------------------------------------------------------------
+# 1.4 GLM as complete model:
+#         "alpha ~ sex + age + place + Phenotype*Diet*Group + (1|Participant)" 
+#-------------------------------------------------------------------------------
+
+lmm.res.ls <- list()
+
+for (i in unique(alpha.df.long$Diversity_Index)) {
+  
+data.lm <- alpha.df.long %>% 
+              filter(Diversity_Index == i) %>% 
+              mutate(Value = Value)
+
+ res.lmer <- lmerTest::lmer(Value ~ sex + 
+                              sc_age + 
+                              center_name + 
+                              sc_phenotype_MIRLIR*diet_name*Time_point + (1|ID), 
+                              data = data.lm)
+ 
+ lmm.res.ls[[i]] <- res.lmer
+ 
+}
+```
+
+## Results: Alpha diveristy
+
+1.0. Baseline: T0 between diets with disregard to phenotype.\
+\
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+wil.res.alpha.1.0
+```
+\
+\
+\
+1.1. Pairwise test per subgroup (phenotype_diet) \
+1.2. Pairwise test per diet disregarding phenotype (diet) \
+1.3. Pairwise test per phenotype disregarding diet (phenotype) \
+\
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+for (i in names(alpha.stat.ls)) {
+  
+  print(kable(alpha.stat.ls[[i]], caption = i ))
+  
+}
+
+alpha.plots.ls
+```
+
+```{r , message=FALSE, warning=FALSE, results='hide', echo=FALSE}
+################################################################################
+# Beta diversity
+################################################################################
+# Fit ADONIS model to beta diversity ordination
+# Normalization: CSS, rarefaction. 
+# Level: ASV, Genus. 
+#-------------------------------------------------------------------------------
+# Make CSS normalized count 
+otu.tab.css <- phyloseq_to_metagenomeSeq(ps1.f1) %>% 
+                    cumNorm(., p=cumNormStatFast(.)) %>% 
+                      MRcounts(., norm=TRUE, log=TRUE) %>% 
+                      as.data.frame()
+
+# Make a copy for ps1 and replace OTU table with CSS normalized table 
+ps1.css <- ps1.f1
+
+otu_table(ps1.css) <- otu_table(otu.tab.css, taxa_are_rows = TRUE)
+
+# Combine phyloseqs in a list and glom them 
+pss.norm.ls <- list(ps.rare.asv = ps1.rare, 
+                    ps.rare.genus = tax_glom(ps1.rare, "Genus"), 
+                    ps.css.asv = ps1.css, 
+                    ps.css.genus = tax_glom(ps1.css, "Genus"))
+
+# List of distances to use 
+used.dist <- c("unifrac", "wunifrac", "jaccard", "bray")
+
+
+
+#-------------------------------------------------------------------------------
+# 2.2.1 Phenotype/diet stratified: 
+# "dist ~ Participant_ID + sex + age + place + Group" 
+#-------------------------------------------------------------------------------
+# Formulas for ADONIS testing 2.2
+adonis.formula.ls <- list()
+
+adonis.formula.ls[["Random"]]<- paste0("dist.inst ~ ", 
+                                        "ID", "+",
+                                        "Time_point")
+
+res.adonis.2.2 <- list()
+
+for (i1 in unique(ps1.f1.meta$phenotype_diet)) {
+  
+  for (i2 in 1:length(pss.norm.ls)) {
+    
+    ps.dist <- prune_samples(ps1.f1.meta$phenotype_diet == i1, 
+                             pss.norm.ls[[i2]])
+    
+    ps.meta <- ps.dist %>% 
+                sample_data() %>% 
+                as.matrix() %>% 
+                as.data.frame()
+    
+    for (i3 in used.dist) {
+      
+      for (i4 in 1:length(adonis.formula.ls)) {
+        
+        res.names <- paste0(names(pss.norm.ls)[i2], "_", i3, "_", 
+                            names(adonis.formula.ls)[i4], "_", 
+                            i1)  
+      
+        dist.inst <- distance(ps.dist, method = i3, type = "samples")
+  
+        res.adonis.2.2[[res.names]] <- adonis2(formula = as.formula(adonis.formula.ls[[i4]]), 
+                                                data = ps.meta, 
+                                                by = "terms", 
+                                                permutations = 99, 
+                                                parallel = 4) %>% 
+                                          tidy() %>% 
+                                          mutate(Distance = i3, 
+                                                 Random_effect = names(adonis.formula.ls)[i4], 
+                                                 PS = names(pss.norm.ls)[i2], 
+                                                 Strata = i1)
+      }
+      
+    }
+    
+  }
+  
+}
+
+```
+
+## Results: Beta diversity
+
+2.2.1 Phenotype/diet stratified: \
+"dist ~ Participant_ID + Group" \
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+for (i in names(res.adonis.2.2)) {
+  
+  print(kable(res.adonis.2.2[[i]], caption = i ))
+  
+}
+```
+
+
+#### 3. DA of taxa between T0 and T1**
+
+```{r , message=FALSE, warning=FALSE, results='hide', echo=FALSE}
+#-------------------------------------------------------------------------------
+# MAASLIN: Extract data
+#-------------------------------------------------------------------------------
+source("R/phy_taxa_filter.R")
+
+# Combine phyloseqs 
+ps.ls <- list(ASV_level = ps1.f1, 
+                    Genus_level = tax_glom(ps1.f1, "Genus"))
+
+out.folder <- "out/maaslin_final/"
+dir.create(out.folder, recursive = TRUE)
+
+res.maas.long <- NULL
+
+for (i1 in names(ps.ls)) {
+  
+  ps <- ps.ls[[i1]]
+  
+  for (i2 in unique(ps1.f1.meta$phenotype_diet))  {
+  
+    ps.gr <- prune_samples(ps1.f1.meta$phenotype_diet == i2, ps)
+  
+    for (i3 in c(0.1, 0.25, 0.5)) {
+      
+       inst.name <- paste0(i1, "_", i2, "_", i3)
+      
+       ps.gr <- phy_taxa_filter(ps.gr, 
+                                prev = i3, 
+                                group_col = "Time_point")
+    
+       ps.gr.asv <- ps.gr %>% 
+                      otu_table()  %>% 
+                      as.matrix()  %>% 
+                      as.data.frame() 
+       
+       ps.gr.meta <- ps.gr %>% 
+                      sample_data() %>% 
+                      as.matrix() %>% 
+                      as.data.frame()
+    
+       maas.out <- Maaslin2(
+                          input_data =  ps.gr.asv, 
+                          input_metadata = ps.gr.meta, 
+                          output = paste0(out.folder, inst.name), 
+                          fixed_effects = c("Time_point"), 
+                          random_effects = "ID", 
+                          reference = "Time_point,TD1", 
+                          correction = "BH", 
+                          cores = 4, 
+                          min_abundance = 0, 
+                          min_prevalence = 0, 
+                          min_variance = 0, 
+                          normalization = "CSS", 
+                          transform = "LOG", 
+                          analysis_method = "LM", 
+                          max_significance = 0.25)
+    
+  
+  res.maas.long <- rbind(res.maas.long, cbind(maas.out$results, 
+                                              Strata = inst.name, 
+                                              Tax_level = i1, 
+                                              phenotype_diet = i2, 
+                                              Cut_off = i3))  
+
+      }
+ 
+    }
+  
+}
+
+# Plot Maaslin results 
+#---------------------
+res.maas.long.f <- res.maas.long %>% 
+                    filter(qval <= 0.2)
+
+maas.plot <- ggplot(res.maas.long.f, 
+                        aes(x = coef, y = feature)) + 
+                        geom_segment(aes(x = 0, xend = coef, 
+                                     y = feature, yend = feature), 
+                                     color = "black", alpha = 0.75) + 
+                        geom_vline(xintercept = 0, alpha = 0.75) + 
+                        geom_point(size = 3.5, alpha = 0.9) + 
+                        facet_grid(. ~ Strata) + 
+                        theme_bw() +
+                        theme(panel.grid.major.x = element_blank(),
+                              panel.grid.minor.x = element_blank(), 
+                              axis.text.y = element_text(face = "italic")) +
+                        ylab("") + xlab("Coeficient")
+```
+
+**3.1. Phenotype/diet stratified: (MaAsLin) term - Group, random effect - Participant** \
+\
+**Table:** Fifty most significantly different taxa according to Maaslin2. \
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+maas.print <- res.maas.long[order(res.maas.long$qval), ] %>% 
+        .[1:50, ]
+
+print(kable(maas.print))
+```
+\
+\
+\
+**Figure:** Significantly different taxa (q <= 0.2) between groups according to 
+Maaslin2. Minimal taxa prevalence per within group 50%. \
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+maas.plot
+```
+\
+\
+\
+**3.2. Phenotype/diet stratified: Paired Wilcox by Group. Normalization CSS & Rarefaction.** \
+```{r , message=FALSE, warning=FALSE, results='hide', echo=FALSE}
+#-------------------------------------------------------------------------------
+# Wilcoxon - paired test
+#-------------------------------------------------------------------------------
+source("R/phy_taxa_filter.R")
+
+pss.norm.ls[["ps.relat.asv"]] <- transform_sample_counts(ps1.f1, function(x) x/sum(x))
+
+pss.norm.ls[["ps.relat.genus"]] <- ps1.f1 %>%  
+                                      tax_glom(., "Genus") %>% 
+                                      transform_sample_counts(., function(x) x/sum(x))
+
+res.wilcox.long <- NULL
+
+for (i1 in names(pss.norm.ls)) {
+  
+  ps <- pss.norm.ls[[i1]]
+  
+  for (i2 in unique(ps1.f1.meta$phenotype_diet))  {
+  
+    ps.gr <- prune_samples(ps1.f1.meta$phenotype_diet == i2, ps)
+  
+    for (i3 in c(0.1, 0.25, 0.5)) {
+      
+       inst.name <- paste0(i1, "_", i2, "_", i3)
+      
+       ps.gr <- phy_taxa_filter(ps.gr, 
+                                prev = i3, 
+                                group_col = "Time_point")
+    
+       ps.gr.meta <- ps.gr %>% 
+                      sample_data() %>% 
+                      as.matrix() %>% 
+                      as.data.frame() %>% 
+                      group_by(ID) %>% 
+                      arrange(Time_point, .by_group = TRUE)
+       
+       ps.gr.asv <- ps.gr %>% 
+                      otu_table()  %>% 
+                      as.matrix()  %>% 
+                      t() %>% 
+                      as.data.frame() 
+       
+       ps.gr.asv <- ps.gr.asv[ps.gr.meta$SeqID, ] %>% 
+                      mutate(Time_point = ps.gr.meta$Time_point)
+       
+       res.tax.wil <- NULL
+       
+       for(i4 in colnames(ps.gr.asv)) {
+         
+         if(i4 != "Time_point") {
+           
+          res.tax.wil <- wilcox.test(as.formula(paste0(i4, "~", "Time_point")), 
+                             paired = TRUE, data = ps.gr.asv) %>% 
+                             tidy() %>% 
+                             mutate(taxa = i4, 
+                                    Strata = i1, 
+                                    phenotype_diet = i2, 
+                                    Cut_off = i3) %>% 
+                             bind_rows(res.tax.wil, .)
+           
+         }
+         
+       }
+    
+  
+       res.tax.wil$qval <- p.adjust(res.tax.wil$p.value, method = "fdr")
+       
+       res.wilcox.long <- bind_rows(res.wilcox.long, res.tax.wil)
+    
+      }
+ 
+    }
+  
+}
+
+# Plot Wilcox data 
+#-----------------
+res.wil.p <- res.wilcox.long[res.wilcox.long$qval <= 0.2, ] %>% 
+                      mutate(Comb_meta = paste0(Strata, "--", 
+                                                phenotype_diet, "--", 
+                                                Cut_off)) %>% 
+                      select(c("taxa", "qval", "Comb_meta")) %>% 
+                      spread(Comb_meta, qval) %>% 
+                      column_to_rownames("taxa")
+    
+res.wil.p[is.na(res.wil.p)] <- 0 
+
+
+wil.heat.1 <- Heatmap(res.wil.p, 
+                  clustering_distance_rows = "spearman",
+                  row_dend_width = unit(1, "in"),
+                  rect_gp = gpar(col = "gray30", lwd = 0.01), 
+                  column_names_rot = 45, )
+
+
+res.wil.p025 <- res.wilcox.long[res.wilcox.long$qval <= 0.2, ] %>% 
+                      mutate(Comb_meta = paste0(Strata, "--", 
+                                                phenotype_diet, "--", 
+                                                Cut_off)) %>% 
+                      filter(Cut_off == 0.25) %>% 
+                      select(c("taxa", "qval", "Comb_meta")) %>% 
+                      spread(Comb_meta, qval) %>% 
+                      column_to_rownames("taxa")
+    
+res.wil.p025[is.na(res.wil.p025)] <- 0 
+
+wil.heat.2 <- Heatmap(res.wil.p025, 
+                  clustering_distance_rows = "spearman",
+                  row_dend_width = unit(1, "in"),
+                  rect_gp = gpar(col = "gray30", lwd = 0.01))
+
+```
+
+\
+**Table:** Fifty most significantly different taxa according to Wilcox test. \
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+res.wilcox.print <- res.wilcox.long[order(res.wilcox.long$qval), ] %>% 
+                      .[1:50, ]
+
+print(kable(res.wilcox.print))
+```
+\
+\
+\
+**Figure:** Significantly different taxa (q <= 0.2) between groups according to 
+Wilcoxon test.\
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+wil.heat.1
+```
+\
+\
+\
+**Figure:** Significantly different taxa (q <= 0.2) between groups according to 
+Wilcoxon. Minimal taxa prevalence per within group 25%. \
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+wil.heat.2
+```
+
+
+#### II. Correlation between base microbiome (T0) and change in metabolic parameters.
+
+\
+**1. Paired correlation**
+Concept: Correlated ASVs/Genera at T0 with change in metabolic parameters (delta)
+between T0 and T1. \
+Normalization: CSS & Rarefaction \
+Correlation: Spearman \
+
+```{r , message=FALSE, warning=FALSE, results='hide', echo=FALSE}
+# Select column for calculation of delta 
+delt.cols <- c("Matsuda", "misi", "HOMA_IR", "CRP", 
+                "log10_Matsuda", "log10_misi", "log10_HOMA_IR", "log10_CRP")
+
+ps1.f1.meta.delta <- ps1.f1.meta %>%
+                        group_by(ID) %>%
+                        arrange(Time_point, .by_group = TRUE) %>%
+                        select(delt.cols) %>% 
+                        mutate_at(vars(-group_cols(), delt.cols), 
+                                   function(x) {as.numeric(x[2]) - as.numeric(x[1])}) %>% 
+                        ungroup() %>% 
+                        select(-ID) %>% 
+                        setNames(., paste0("delta_", colnames(.))) %>% 
+                        cbind(ps1.f1.meta, .) 
+
+ps1.f1.meta.ciw1 <-  ps1.f1.meta.delta %>% 
+                            filter(CIW == "1") %>% 
+                            select_if(grepl("delta_", colnames(ps1.f1.meta.delta)))
+
+cut.offs <- c(0.25, 0.5, 0.75)
+
+
+cor.res.all <- NULL
+
+for (i1 in names(pss.norm.ls)) {
+  
+  for(i2 in cut.offs) {
+    
+     ps.otu <- pss.norm.ls[[i1]] %>% 
+                  prune_samples(ps1.f1.meta$CIW == "1", .) %>% 
+                  phy_taxa_filter(., prev_fraction = i2) %>% 
+                  otu_table(.) %>% 
+                  as.matrix(.) %>% 
+                  t(.) %>% 
+                  as.data.frame(.)
+     
+     cor.res <- NULL
+     
+     for (i3.taxa in colnames(ps.otu)) {
+       
+       for (i4.metab in colnames(ps1.f1.meta.ciw1)) {
+         
+         cor.res <- cor.test(ps.otu[, i3.taxa], 
+                             ps1.f1.meta.ciw1[, i4.metab], 
+                             method = "spearman") %>% 
+                       tidy() %>% 
+                       mutate(Taxa = i3.taxa, 
+                              Metabolite = i4.metab, 
+                              Cut_Off = i2, 
+                              Phyloseq = i1) %>% 
+                       bind_rows(cor.res, .)
+         
+       } 
+       
+     }
+     
+     cor.res.all <- cor.res %>% 
+                       mutate(q.value = p.adjust(p.value, method = "fdr")) %>% 
+                       bind_rows(cor.res.all, .)
+    
+  }
+  
+}
+
+cor.res.all <- cor.res.all[order(cor.res.all$q.value), ]
+```
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+print.cor <- cor.res.all[1:50, ]
+
+print(kable(print.cor))
+```
+
+
+\
+\
+**2. Correlation of overall microbial composition and change in metabolic parameters (delta)** \
+Normalization: CSS & rare \
+Taxonomic levels: ASV & Genera \
+2.1. PERMANOVA: The changes in metabolic parameters (delta) as constitutes terms of the
+model: \
+```{r , message=FALSE, warning=FALSE, results='hide', echo=FALSE}
+# Prepare variables 
+# List of distances to use 
+used.dist <- c("unifrac", "wunifrac", "jaccard", "bray")
+
+# Columns that will be used as last independent variable
+delta.form.col <- paste0("delta_", grep("log10", 
+                                        delt.cols, 
+                                        value = TRUE, 
+                                        invert = TRUE)) 
+
+# Subset only CIW1                  
+ciw1.meta <- ps1.f1.meta.delta[ps1.f1.meta.delta$CIW == 1, ]
+
+# Test in a loop 
+res.ord.delta <- list()
+
+# Per normalization/taxonomic level
+for (i1.ps in names(pss.norm.ls)) {
+  
+  # Per term (independent delta variable)
+  for (i2.term in delta.form.col) {
+    
+     # Subset only time point 1 and NA in phyloseq
+     ps.dist <- pss.norm.ls[[i1.ps]] %>% 
+                  prune_samples(ps1.f1.meta$CIW == "1", .) %>% 
+                  prune_samples(!is.na(ciw1.meta[, i2.term]), .)
+     
+     # Subset only time point 1 and NA in metadata
+     ps.meta <- ciw1.meta[!is.na(ciw1.meta[, i2.term]), ]
+          
+          # Per distance
+          for (i3.dist in used.dist) {
+            
+            # Formula for ADONIS testing 2.0
+            adonis.formula <- paste0("dist.inst ~ ", "sex", " + ", 
+                                         "sc_age", " + ", 
+                                         "center_name", " + ", 
+                                          i2.term)
+            
+            res.names <- paste0(i1.ps, "_", i2.term, "_", i3.dist)  
+      
+            dist.inst <- distance(ps.dist, method = i3.dist, type = "samples")
+  
+            res.ord.delta[[res.names]] <- adonis2(formula = as.formula(adonis.formula), 
+                                              data = ps.meta, 
+                                              by = "terms", 
+                                              permutations = 999, 
+                                              parallel = 4) %>% 
+                                          tidy() %>% 
+                                          mutate(Distance = i3.dist,
+                                                 Term = i2.term,
+                                                 PS = i1.ps)
+            
+          }
+
+    }
+     
+}
+     
+```
+
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+for (i in names(res.ord.delta)) {
+  
+  print(kable(res.ord.delta[[i]], caption = i ))
+  
+}
+
+```
+
+
+"dist ~ delta_metab_1 + delta_metab_2 + delta_metab_3..." \
+2.2. envfit: The changes in metabolic parameters (delta) fitted on top of ordination. 
+\
+\
