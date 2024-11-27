@@ -4,7 +4,8 @@
 corr_multipale <- function(x_columns, 
                            y_columns, 
                            xy_data_frame, 
-                           method = "spearman") {
+                           method = "spearman", 
+                           exact = FALSE) {
   
   require(tidyverse)
   require(broom)
@@ -17,7 +18,8 @@ corr_multipale <- function(x_columns,
       
       ResOut <- cor.test(xy_data_frame[[i]], 
                    xy_data_frame[[j]], 
-                   method = method) %>% 
+                   method = method, 
+                   exact = exact) %>% 
                   tidy() %>% 
                   mutate(x = i, y = j) %>% 
                   bind_rows(ResOut, .)

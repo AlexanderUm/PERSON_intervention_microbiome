@@ -82,7 +82,7 @@ plot_extracted_rda_data <- function(extracted_data,
       }
       
       # Add custom shape
-      if(!is.null(color_vec)) {
+      if(!is.null(shape_vec)) {
         p.out <- p.out + 
                   scale_shape_manual(values = shape_vec)
       }
