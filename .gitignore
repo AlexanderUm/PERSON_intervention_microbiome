@@ -13,3 +13,4 @@ data/
 out/ 
 manuscript/
 .Rproj.user
+*__test
