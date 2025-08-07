@@ -100,7 +100,9 @@ meta <- meta[sample_names(ps), ] %>%
                                                 "", 
                                                 .data[[TimePointCol]])) + 1),
                !!DietCols := as.factor(.[[DietCols]]), 
-               !!PhenCol := as.factor(.[[PhenCol]]))
+               !!PhenCol := as.factor(.[[PhenCol]]), 
+               All_samples = as.factor("All_samples")) %>% 
+        dplyr::rename(TAG = hfmm_tag_0, MISI = misi)
 
 # Add new columns
 for(i in names(NewCols)) {

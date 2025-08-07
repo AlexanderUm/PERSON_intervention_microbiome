@@ -17,7 +17,8 @@ PRM[["general"]] <- list("seed" = 3894568,
                                       "qiime2R", "ggsignif", "broom", 
                                       "MicrobiomeStat", "vegan", "cowplot", 
                                       "ComplexHeatmap", "FSA", "usedist", 
-                                      "MicrobiomeStat", "Maaslin2"))
+                                      "MicrobiomeStat", "Maaslin2", "caret", 
+                                      "pROC"))
 
 
 PRM[["data"]] <- list("q_path" = "data/", 
@@ -79,8 +80,8 @@ PRM[["da"]] <- list("dir_out" ="out/da",
                     "bar_summary_functions" = c("median"))
 
 
-PRM[["corr"]] <- list("dir_out" ="out/correlations",
-                      "tax_lvl" = c("ASV", "Genus"),
+PRM[["corr"]] <- list("dir_out" ="out/check_correlations",
+                      "tax_lvl" = c("Genus"),
                       "norm" = c("CSS"),
                       "strata_cols" = c("Diet", "DietPhenotype"),
                       "corr_type" = c("Shift", "Baseline"),
@@ -89,13 +90,30 @@ PRM[["corr"]] <- list("dir_out" ="out/correlations",
                       "base_col_lvl" = c("Time" = "Week 0"),
                       "shift_col_lvl" = list("Time" = c("Week 0", "Week 12")),
                       "min_prev" = c("DietPhenotype" = 0.5),
-                      "max_qval" = 0.1,
-                      "qval_to_use" = "qval_group", # Options: "p.value", "qval_group", "qval_all"
-                      "min_est" = 0.2,
+                      "max_qval" = 0.001,
+                      "qval_to_use" = "p.value", # Options: "p.value", "qval_group", "qval_all"
+                      "min_est" = 0.4,
                       "corr_cols" = c("Matsuda", "HOMA_IR", 
-                                      "misi","hfmm_tag_0", "CRP"),
+                                      "MISI","TAG", "CRP"),
+                      "da_res_tab_path" = "out/da/tabs/",
                       "plot_lm_method" = "lm", 
                       "scatter_p_pref" = "Q")
+
+
+PRM[["resp"]] <- list("dir_out" ="out/response",
+                      "tax_lvl" = c("Genus"),
+                      "norm" = c("CSS"), 
+                      "strata_cols" = c("Diet", "DietPhenotype", "All_samples"),
+                      "data_type" = c("Shift", "Baseline"),
+                      "shift_col_lvl" = list("Time" = c("Week 0", "Week 12")),
+                      "resp_base_cols" = c("Matsuda", "misi"), 
+                      "split_fun" = c("resp_median", "resp_3tile", "resp_5tile"), 
+                      "min_prev" = c("DietPhenotype" = 0.5), 
+                      "base_col_lvl" = c("Time" = "Week 0"), 
+                      "n_cv" = 4, 
+                      "cv_repeats" = 10, 
+                      "n_trees" = 1001, 
+                      "n_random" = 10)
 
 
 # Write objects 
