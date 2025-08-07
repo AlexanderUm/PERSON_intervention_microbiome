@@ -76,17 +76,20 @@ for(i in 1:nrow(IterGrid)) {
     for(j in levels(DataLs$meta[[iVar]])) {
       
       # Subset data 
-      jAlphaDf <- AlphaDf %>% 
-                      filter(.[[iVar]] == j) %>% 
-                      arrange(.[[PRM$general$part_id_col]], 
-                              .[[PRM$general$time_numeric]]) %>% 
-                      droplevels() 
+      jAlphaDataLs <- list()
       
-      jFormula <- paste0(iInd, " ~ ", PRM$general$time_numeric)
+      for(k in 1:2) {
+        
+        jAlphaDataLs[[k]] <- AlphaDf %>% 
+                      filter(.[[iVar]] == j, 
+                             .[[PRM$general$time_numeric]] == 
+                               sort(unique(.[[PRM$general$time_numeric]]))[k]) %>% 
+                      droplevels() %>% 
+                      arrange(.[[PRM$general$part_id_col]]) 
+      }
       
       # Test and collect results per variable level into a single data frame
-      ResWl <- wilcox.test(as.formula(jFormula), 
-                           data = jAlphaDf, 
+      ResWl <- wilcox.test(jAlphaDataLs[[1]][[iInd]], jAlphaDataLs[[2]][[iInd]],
                            paired = TRUE) %>% 
                   tidy() %>% 
                   mutate(!!iVar := j) %>% 
