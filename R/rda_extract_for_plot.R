@@ -22,9 +22,9 @@ rda_extract_for_plot <- function(dists_ls, metadata, form) {
     obj.sum <- summary(rda.obj)
     
     # Extract scores
-    df.ls[[i]][["main"]] <- obj.sum$sites[, 1:2] %>%
-                                as.data.frame() %>%
-                                bind_cols(metadata) 
+    df.ls[[i]][["main"]] <- scores(rda.obj, display = "sites", choices = 1:2) %>% 
+                              as.data.frame() %>%
+                              bind_cols(metadata) 
     
     # Explained variations
     df.ls[[i]][["var_expl"]] <- round(obj.sum$cont$importance[2, 1:2]*100, 2) %>% 

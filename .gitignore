@@ -1,5 +1,5 @@
 # Ignore R project files 
-.RData 
+*.RData 
 .Rhistory 
 .Rproj.user/ 
 
@@ -12,5 +12,6 @@
 data/
 out/ 
 manuscript/
-.Rproj.user
-*__test
+
+# Test files
+*__test*

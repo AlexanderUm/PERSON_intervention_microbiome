@@ -101,7 +101,10 @@ for(i in 1:nrow(PrmGirdShiftInTime)) {
                        by = "terms", 
                        permutations = PRM$beta$n_perm, 
                        parallel = 4) %>% 
-                  tidy() %>% 
+                  as.data.frame() %>% 
+                  mutate(across(everything(), 
+                                function(x){round(x, PRM$general$round_to)})) %>% 
+                  rownames_to_column(var = "Term") %>% 
                   mutate(Distance = iDistName,
                          Strata = iStrata,
                          Strata_lvl = j,
@@ -150,14 +153,14 @@ ResRdaPlotsOrdLs <- list()
 
 # Plot text (stat results)
 StatTextDf <- ResShiftInTimeDf %>% 
-                  filter(term == trimws(gsub(".*\\+", "",
+                  filter(Term == trimws(gsub(".*\\+", "",
                                              PRM$beta$rda_plot_formula))) %>% 
-                  mutate(across(all_of(c("R2", "p.value")), 
+                  mutate(across(all_of(c("R2", "Pr(>F)")), 
                                 function(x){sprintf("%.3f", round(x, 3))})) %>% 
                   mutate(R2_text = ifelse(R2 == "0.000", 
                                           "R^2<0.001", paste0("R^2==", R2)), 
-                         p_text = ifelse(p.value == "0.000", 
-                                         "P<0.001", paste0("P==", p.value))) %>% 
+                         p_text = ifelse(`Pr(>F)` == "0.000", 
+                                         "P<0.001", paste0("P==", `Pr(>F)`))) %>% 
                   mutate(Text = paste0(p_text, "~~(", R2_text, ")")) %>% 
                   select(Distance, Strata, Strata_lvl, Taxa_lvl, Norm_lvl, Text)
 
@@ -188,8 +191,8 @@ for(i in 1:nrow(PrmGirdRda)) {
     
     # Custom function: Make RDA data  
     jRdaData <- rda_extract_for_plot(dists_ls = jDistMatrixLs, 
-                                        metadata = jMeta, 
-                                        form = PRM$beta$rda_plot_formula)
+                                     metadata = jMeta, 
+                                     form = PRM$beta$rda_plot_formula)
     
     # Plot 
     jRdaPlot <- plot_extracted_rda_data(extracted_data = jRdaData, 
