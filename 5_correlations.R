@@ -152,6 +152,7 @@ for(i in 1:nrow(PrmGrid)) {
               row.names = FALSE)
   }
   
+  
   #-----------------------------------------------------------------------------
   # Visualize correlations 
   #-----------------------------------------------------------------------------
@@ -233,7 +234,7 @@ for(i in 1:nrow(PrmGrid)) {
     #---------------------------------------------------------------------------
     # Scatter plots 
     #---------------------------------------------------------------------------
-    dir.create(paste0(PRM$corr$dir_out, "/plots/scatter/", iNameAdd), 
+    dir.create(paste0(PRM$corr$dir_out, "/plots/scatter/", iType), 
                showWarnings = FALSE, recursive = TRUE)
     
     # Text color 
@@ -305,76 +306,13 @@ for(i in 1:nrow(PrmGrid)) {
                              max(DataScatter[[jTaxa]])*1.15))
     
     ggsave(filename = paste0(PRM$corr$dir_out, 
-                             "/plots/scatter/", iNameAdd, "/",  
+                             "/plots/scatter/", iType, "/",  
                              gsub(" |\\.", "_", jTaxa), "-", jMet, ".svg"), 
            plot = ScatterPlot, 
            width = nrow(TextDf)*2.5+0.5, 
            height = 3)
-    
-    
-    #---------------------------------------------------------------------------
-    # Heat map with the significant taxa 
-    #---------------------------------------------------------------------------
-    iDaPath <- paste0(PRM$corr$da_res_tab_path, "/", iStrata)
-    
-    if(dir.exists(iDaPath)) {
+  
       
-      iDaTab <- grep(iLvl, list.files(iDaPath), value = TRUE) 
-      
-      iDaRes <- read.csv(paste0(iDaPath, "/", iDaTab)) %>% 
-                  filter(qval <= PRM$da$max_qval) %>% 
-                  mutate(feature = fix_taxa_names_for_plot(feature))
-      
-      iResCorrSigLvls <- ResCorrAllLvls %>% 
-                            filter(x %in% iDaRes$feature) 
-      
-      #-----------------------------------------------------------------------------
-      # Heat map 
-      # Data preparation   
-      HeatDfs <- list()
-      
-      for(j in c("estimate", PRM$corr$qval_to_use)) {
-        
-        HeatDfs[[j]] <- iResCorrSigLvls %>% 
-                          select(all_of(c("x", "y" , j , "Strata_Lvl"))) %>% 
-                          pivot_wider(names_from = all_of(c("Strata_Lvl", "y")), 
-                                      values_from = all_of(j), 
-                                      names_sep = "--") %>% 
-                          column_to_rownames(var = "x") %>% 
-                          select(order(colnames(.)))
-      }
-      
-      # Heat map plot 
-      CorrHeatPlot <- Heatmap(HeatDfs$estimate, 
-                              name = "Correlation \nestimate",
-                              column_labels = gsub(".*--", "", colnames(HeatDfs$estimate)), 
-                              column_split = gsub("--.*", "", colnames(HeatDfs$estimate)), 
-                              row_names_side = "left", 
-                              row_names_gp = gpar(fontface = "italic", 
-                                                  fontfamily = "serif"), 
-                              column_names_rot = 45, 
-                              height = unit(nrow(HeatDfs$estimate)*0.25, "in"), 
-                              width = unit(ncol(HeatDfs$estimate)*0.4, "in"),
-                              cluster_rows = TRUE, 
-                              show_row_dend = FALSE,
-                              cluster_columns = FALSE, 
-                              rect_gp = gpar(col = "gray25", lwd = 0.5),
-                              cell_fun = function(j, i, x, y, width, height, fill) {
-                                if(HeatDfs[[PRM$corr$qval_to_use]][i, j] <= 
-                                   PRM$corr$max_qval) {
-                                  grid.text(sprintf("%.3f", 
-                                                    HeatDfs[[PRM$corr$qval_to_use]][i, j]), 
-                                            x, y, gp = gpar(fontsize = 8, 
-                                                            col = "white", 
-                                                            fontface = "bold"))
-                                } else {
-                                  grid.text(sprintf("%.3f", 
-                                                    HeatDfs[[PRM$corr$qval_to_use]][i, j]), 
-                                            x, y, gp = gpar(fontsize = 6, 
-                                                            col = "gray40"))}})
-      
-      }
-    
     }
   
   }
