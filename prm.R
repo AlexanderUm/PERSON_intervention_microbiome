@@ -81,7 +81,7 @@ PRM[["da"]] <- list("dir_out" ="out/da",
                     "bar_summary_functions" = c("median"))
 
 
-PRM[["corr"]] <- list("dir_out" ="out/check_correlations",
+PRM[["corr"]] <- list("dir_out" ="out/correlations",
                       "tax_lvl" = c("Genus"),
                       "norm" = c("CSS"),
                       "strata_cols" = c("Diet", "DietPhenotype"),
