@@ -237,8 +237,8 @@ for(i in 1:nrow(PrmGirdRda)) {
 }
 
 
-#-------------------------------------------------------------------------------
-# Combine plots 
+#===============================================================================
+# Main results - plot and stat tables 
 #-------------------------------------------------------------------------------
 PrmGrid <- expand.grid("Tax_lvl" = PRM$beta$tax_lvl, 
                        "Normal" = PRM$beta$norm, 
@@ -254,6 +254,17 @@ for(i in 1:nrow(PrmGrid)) {
   
   iStrata <- PrmGrid[i, "Strata"]
   
+  if(iStrata == "Diet") {
+    
+    iNameAdd <- "Supp_" 
+    
+  } else {
+    
+    iNameAdd <- ""
+    
+  }
+  
+  # Plots 
   GrobLs <- list()
   
   for(j in names(ResRdaPlotsOrdLs[[iLvl]][[iNorm]][[iStrata]])) {
@@ -273,16 +284,29 @@ for(i in 1:nrow(PrmGrid)) {
   GrobCombLeg <- plot_grid(GrobComb, ResRdaPlotsLs[[1]][[1]][[1]]$Legend, 
                            rel_widths = c(0.9, 0.1))
   
-  save_plot(filename = paste0(PRM$beta$dir_out, 
-                              "/plots/", 
-                              iStrata, "/",
-                              "dbRDA_grid--",
-                              iLvl, "--" , 
-                              iNorm, ".png"), 
+  save_plot(filename = paste0(PRM$general$dir_main_fig, "/",
+                              iPlotNameAdd, "Fig1_dbRDA_", 
+                              iLvl, "_" , iNorm, ".png"), 
             plot = GrobCombLeg, 
             base_height = PRM$beta$PlotGridRowSize*length(GrobLs), 
-            base_width = PRM$beta$PlotGridColSize)
+            base_width = PRM$beta$PlotGridColSize*length(unique(DataLs$meta[[iStrata]])))
+  
+  # Statistical tables 
+  ResShiftInTime[[iLvl]][[iNorm]][[iStrata]] %>% 
+    list_flatten() %>% 
+    bind_rows() %>% 
+    select(-Strata) %>% 
+    rename(`P-value` = `Pr(>F)`, 
+           Strata = Strata_lvl, 
+           `Taxonomic Level` = Taxa_lvl, 
+           Normalization = Norm_lvl, 
+           `N premutations` = Permutations) %>% 
+    write_csv(paste0(PRM$general$dir_main_fig, "/",
+                     iPlotNameAdd, "Fig1_dbRDA_", 
+                     iLvl, "_" , iNorm, ".csv"), na = "")
+  
 }
+
 
 # Clean environment 
 rm(list = ls())

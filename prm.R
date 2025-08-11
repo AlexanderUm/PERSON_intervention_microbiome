@@ -57,7 +57,7 @@ PRM[["beta"]] <- list("dir_out" ="out/beta",
                                                "Weighted UniFrac",
                                                "Jaccard",
                                                "Bray-Curtis"),
-                       "PlotGridColSize" = 12,
+                       "PlotGridColSize" = 3,
                        "PlotGridRowSize" = 3,
                        "out_dir_path" = "out/beta")
 
