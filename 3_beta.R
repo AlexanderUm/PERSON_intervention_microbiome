@@ -285,7 +285,7 @@ for(i in 1:nrow(PrmGrid)) {
                            rel_widths = c(0.9, 0.1))
   
   save_plot(filename = paste0(PRM$general$dir_main_fig, "/",
-                              iPlotNameAdd, "Fig1_dbRDA_", 
+                              iNameAdd, "Fig1_dbRDA_", 
                               iLvl, "_" , iNorm, ".png"), 
             plot = GrobCombLeg, 
             base_height = PRM$beta$PlotGridRowSize*length(GrobLs), 
@@ -302,7 +302,7 @@ for(i in 1:nrow(PrmGrid)) {
            Normalization = Norm_lvl, 
            `N premutations` = Permutations) %>% 
     write_csv(paste0(PRM$general$dir_main_fig, "/",
-                     iPlotNameAdd, "Fig1_dbRDA_", 
+                     iNameAdd, "Fig1_dbRDA_", 
                      iLvl, "_" , iNorm, ".csv"), na = "")
   
 }
