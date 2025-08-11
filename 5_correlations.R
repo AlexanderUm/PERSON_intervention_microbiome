@@ -35,11 +35,6 @@ format_to_print <- function(x){
                              ">0.001", 
                               paste0("=", sprintf("%.3f", round(x, 3))))}
 
-ResCorrLs <- list()
-
-ResCorrPlotsLs <- list()
-
-
 ################################################################################
 # Correlations 
 ################################################################################
@@ -67,6 +62,11 @@ PrmGrid <- expand.grid("Tax_lvl" = PRM$corr$tax_lvl,
                        "Method" = PRM$corr$corr_method, 
                        stringsAsFactors = FALSE)
 
+SigHeatPlotLs <- list()
+
+SigHeatDfLs <- list()
+
+SigCorrRes <- NULL
 
 for(i in 1:nrow(PrmGrid)) { 
   
@@ -163,6 +163,11 @@ for(i in 1:nrow(PrmGrid)) {
   
   if(nrow(SigTaxaTab) > 1) {
     
+    # Combine All significant results 
+    SigCorrRes <-  SigTaxaTab %>% 
+                        add_row() %>% 
+                        bind_rows(SigCorrRes, .)
+    
     # Write out significant results 
     write.csv(SigTaxaTab, 
             file = paste0(PRM$corr$dir_out, "/tabs/sig/CorrSig_", 
@@ -185,6 +190,9 @@ for(i in 1:nrow(PrmGrid)) {
                           column_to_rownames(var = "x") %>% 
                           select(order(colnames(.)))
     }
+    
+    # Collect to List 
+    SigHeatDfLs[[paste0(iLvl, "_", iNorm)]][[iType]] <- HeatDfs
     
     # Heat map plot 
     CorrHeatPlot <- Heatmap(HeatDfs$estimate, 
@@ -230,6 +238,7 @@ for(i in 1:nrow(PrmGrid)) {
     
     dev.off()
     
+    SigHeatPlotLs[[paste0(iLvl, "_", iNorm)]][[iType]] <- CorrHeatPlotLs
     
     #---------------------------------------------------------------------------
     # Scatter plots 
@@ -240,6 +249,7 @@ for(i in 1:nrow(PrmGrid)) {
     # Text color 
     ColorForQvalue <- c("gray" = "gray", "black" = "black")
     
+    # Format p and estimate for labling 
     ResCorrAllLvls <- ResCorrAllLvls %>%
                       mutate(across(all_of(c(PRM$corr$qval_to_use, "estimate")), 
                                     format_to_print, 
@@ -250,6 +260,7 @@ for(i in 1:nrow(PrmGrid)) {
                                            " [est", text_estimate, "]"), 
                              !!iStrata := Strata_Lvl)
     
+    ScatterPlotLs <- list()
     
     for(j in 1:nrow(SigTaxaTab)) {
       
@@ -262,12 +273,15 @@ for(i in 1:nrow(PrmGrid)) {
       DataScatter <- DataCorr %>% 
                       select(all_of(c(jTaxa, jMet, iStrata))) %>% 
                       mutate(feature = jTaxa, 
-                             top_strip = paste0(jMet, ": ", .data[[iStrata]])) 
+                             top_strip = paste0(jMet, ": ", .data[[iStrata]])) %>% 
+                      mutate(Taxa_Rank = rank(!!sym(jTaxa), ties.method = "min"), 
+                             Met_Rank = rank(!!sym(jMet), ties.method = "min"), 
+                             .by = top_strip)
       
       # Min and max 
       MinYDf<- DataScatter %>% 
-                    summarise(across(all_of(jMet), 
-                                     function(x) min(x, na.rm = TRUE)), 
+                    summarise(!!sym(jMet) := min(!!sym(jMet), na.rm = TRUE),
+                              Met_Rank = min(Met_Rank, na.rm = TRUE),
                               .by = all_of(iStrata))
       
       # Significance label
@@ -279,13 +293,14 @@ for(i in 1:nrow(PrmGrid)) {
                                                   "black", "gray"), 
                              top_strip = paste0(jMet, ": ", 
                                                 .data[[iStrata]]), 
-                             !!jTaxa := max(DataScatter[[jTaxa]])) %>% 
+                             !!jTaxa := max(DataScatter[[jTaxa]]), 
+                             Taxa_Rank = max(DataScatter$Taxa_Rank)) %>% 
                       left_join(MinYDf, by = iStrata)
       
     # Plot                
     ScatterPlot <- ggplot(DataScatter, 
-                     aes(x = .data[[jMet]], 
-                         y = .data[[jTaxa]])) +
+                     aes(x = Met_Rank, 
+                         y = Taxa_Rank)) +
                       geom_point() + 
                       geom_smooth(method = PRM$corr$plot_lm_method, 
                                   se = FALSE) + 
@@ -302,8 +317,10 @@ for(i in 1:nrow(PrmGrid)) {
                                                         family = "serif"), 
                             legend.position = "none") + 
                       scale_color_manual(values = ColorForQvalue) + 
-                      ylim(c(min(DataScatter[[jTaxa]])*1.15, 
-                             max(DataScatter[[jTaxa]])*1.15))
+                      ylim(0, max(DataScatter$Met_Rank)*1.1)
+    
+    # Collect plots
+    ScatterPlotLs[[j]] <- ScatterPlot
     
     ggsave(filename = paste0(PRM$corr$dir_out, 
                              "/plots/scatter/", iType, "/",  
@@ -312,12 +329,116 @@ for(i in 1:nrow(PrmGrid)) {
            width = nrow(TextDf)*2.5+0.5, 
            height = 3)
   
-      
     }
   
+    # Combine scatter plot 
+    CombScatter <- grid.arrange(grobs = ScatterPlotLs, 
+                                left = textGrob("Rank Genera", rot = 90), 
+                                bottom = textGrob("Rank Metabolite"), 
+                                draw = FALSE)
+    
+    ggsave(filename = paste0(PRM$corr$dir_out, 
+                             "/plots/scatter/", iType, "/Combined.svg"), 
+           plot = CombScatter, 
+           width = nrow(TextDf)*3+0.5, 
+           height = nrow(SigTaxaTab)*3)
+    
   }
   
 }
+
+
+#===============================================================================
+# Main figure and corresponding table 
+
+# Table with significant correlations 
+options(scipen = 999)
+
+SigCorrRes %>% 
+  rename(Taxa = x, 
+         Metabolite = y, 
+         Estimate = estimate, 
+         `P-value` = `p.value`, 
+         `Diet-Phenotype` = Strata_Lvl, 
+         `Data Type` = Type) %>% 
+  select(Taxa, Metabolite, Estimate, `P-value`, 
+         `Diet-Phenotype`, `Data Type`) %>% 
+  mutate(across(c(Estimate, `P-value`), function(x){round(x, 5)})) %>% 
+  write.csv(paste0(PRM$general$dir_main_fig, "/Fig5_CorrHeat_", 
+                   paste(PrmGrid[i, ], collapse = "_"), ".csv"), 
+            na = "", row.names = FALSE)
+
+
+# Create and save heat maps from combined significant data that was used for 
+# individual heat maps.
+PrmGrid <- expand.grid("Tax_lvl" = PRM$corr$tax_lvl, 
+                       "Norm" = PRM$corr$norm, stringsAsFactors = FALSE)
+
+for(i in 1:nrow(PrmGrid)) {
+  
+  # Prepare data 
+  iDfLs <- SigHeatDfLs[[paste(PrmGrid[i, ], collapse = "_")]] 
+  
+  iDfEst <- NULL
+    
+  iDfPval <- NULL
+  
+  iSepVec <- NULL
+  
+  for(j in names(iDfLs)) {
+    
+    iDfEst <- rbind(iDfEst, iDfLs[[j]]$estimate)
+    
+    iDfPval <- rbind(iDfPval, iDfLs[[j]]$p.value)
+    
+    iSepVec <- c(iSepVec, rep(j, nrow(iDfLs[[j]]$estimate)))
+    
+  }
+  
+  # Plot data 
+  iHeat <- Heatmap(iDfEst, 
+                name = "Correlation Estimate",
+                column_labels = gsub(".*--", "", colnames(iDfEst)), 
+                column_split = gsub("--.*", "", colnames(iDfEst)), 
+                row_split = iSepVec, 
+                row_names_side = "right", 
+                row_names_gp = gpar(fontface = "italic", 
+                                    fontfamily = "serif"), 
+                column_names_rot = 45, 
+                height = unit(nrow(iDfEst)*0.25, "in"), 
+                width = unit(ncol(iDfEst)*0.4, "in"),
+                cluster_rows = TRUE, 
+                show_row_dend = FALSE,
+                cluster_columns = FALSE, 
+                heatmap_legend_param = list(direction = "horizontal"),
+                rect_gp = gpar(col = "gray25", lwd = 0.5),
+                cell_fun = function(j, i, x, y, width, height, fill) {
+                  if(iDfPval[i, j] <= PRM$corr$max_qval) {
+                    grid.text(sprintf("%.3f", iDfPval[i, j]), 
+                              x, y, gp = gpar(fontsize = 8, 
+                                              col = "white", 
+                                              fontface = "bold"))
+                  } else {
+                    grid.text(sprintf("%.3f", iDfPval[i, j]), 
+                              x, y, gp = gpar(fontsize = 6, 
+                                              col = "gray40"))}})
+  
+  
+  # Write out results 
+  png(filename = paste0(PRM$general$dir_main_fig, 
+                        "/Fig5_CorrHeat_", 
+                        paste(PrmGrid[i, ], collapse = "_"), ".png"), 
+      width = (ncol(iDfEst)*0.4 + 2.5), 
+      height = (nrow(iDfEst)*0.25 + 2.5), 
+      units = "in", 
+      res = 600)
+  
+  draw(iHeat, heatmap_legend_side = "bottom")
+  
+  dev.off()
+  
+}
+#-------------------------------------------------------------------------------
 
 # Clean environment 
 rm(list = ls())
