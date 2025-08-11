@@ -407,7 +407,7 @@ for(i in 1:nrow(PrmGrid)) {
                 column_names_rot = 45, 
                 height = unit(nrow(iDfEst)*0.25, "in"), 
                 width = unit(ncol(iDfEst)*0.4, "in"),
-                cluster_rows = TRUE, 
+                cluster_rows = FALSE, 
                 show_row_dend = FALSE,
                 cluster_columns = FALSE, 
                 heatmap_legend_param = list(direction = "horizontal"),
