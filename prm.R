@@ -19,7 +19,7 @@ PRM[["general"]] <- list("seed" = 3894568,
                                       "qiime2R", "ggsignif", "broom", 
                                       "vegan", "cowplot", 
                                       "ComplexHeatmap", "FSA", "usedist", 
-                                      "Maaslin2", "pROC", "gridExtra"))
+                                      "Maaslin2", "pROC", "gridExtra", "rstatix"))
 
 
 PRM[["data"]] <- list("q_path" = "data/", 
@@ -35,7 +35,6 @@ PRM[["alpha"]] <- list("dir_out" = "out/alpha",
                         "tax_lvl" = "ASV",
                         "norm" = "Rare",
                         "strata_cols" = c("Diet",
-                                          "Phenotype",
                                           "DietPhenotype"),
                         "alpha_cut_kw" = 0.05)
 

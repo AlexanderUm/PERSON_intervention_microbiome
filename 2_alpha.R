@@ -90,11 +90,11 @@ for(i in 1:nrow(IterGrid)) {
       
       # Test and collect results per variable level into a single data frame
       ResWl <- wilcox.test(jAlphaDataLs[[1]][[iInd]], jAlphaDataLs[[2]][[iInd]],
-                           paired = TRUE) %>% 
+                           paired = TRUE, exact = FALSE) %>% 
                   tidy() %>% 
                   mutate(!!iVar := j) %>% 
-                  bind_rows(ResWl, .) %>% 
-                  suppressWarnings()
+                  bind_rows(ResWl, .) 
+      
     }
     
     ShiftTestRes[[iVar]][[iInd]] <- ResWl %>% 
@@ -117,6 +117,16 @@ MaxMinDf <- AlphaDfLong %>%
 ShiftPlots <- list()
   
 for(i in PRM$alpha$strata_cols) { 
+  
+  if(i == "Diet") {
+    
+    iNameAdd <- "Supp_Fig2_" 
+    
+  } else {
+    
+    iNameAdd <- "Fig2_"
+    
+  }
   
   # Plot significance annotation
   iStatRes <- ShiftTestRes[[i]] %>% 
@@ -187,10 +197,24 @@ for(i in PRM$alpha$strata_cols) {
                             p.height = iHeight)
     
     # Save plots 
-    ggsave(paste0(PRM$alpha$dir_out, "/plots/alpha_violin_", i, ".png"), 
+    ggsave(paste0(PRM$general$dir_main_fig, "/", iNameAdd, "alpha.png"), 
            plot = iPlot, 
            width = iWidth, 
            height = iHeight)
+    
+    
+    #---------------------------------------------------------------------------
+    # Write stat tables 
+    
+    lapply(ShiftTestRes[[i]], function(x) {add_row(x)}) %>% 
+      bind_rows() %>% 
+      rename(`P-value` = `p.value`, 
+             Strata = !!sym(i), 
+             `Statsistics (W)` = statistic) %>% 
+      select(-c(Variable_col, method)) %>% 
+      write_csv(paste0(PRM$general$dir_main_fig, "/", iNameAdd, "alpha.csv"), 
+                na = "")
+    
 }
 
 
