@@ -311,13 +311,17 @@ for(i in 1:nrow(PrmGrid)) {
   ResShiftInTime[[iLvl]][[iNorm]][[iStrata]] %>% 
     list_flatten() %>% 
     bind_rows() %>% 
-    select(-Strata) %>% 
+    select(-c(Strata, Taxa_lvl, Norm_lvl, Permutations, Formula)) %>% 
     rename(`P-value` = `Pr(>F)`, 
-           Strata = Strata_lvl, 
-           `Taxonomic Level` = Taxa_lvl, 
-           Normalization = Norm_lvl, 
-           `N premutations` = Permutations) %>% 
-    mutate(across(where(is.numeric), function(x){round(x, 3)})) %>% 
+           `Degrees of Freedom` = Df, 
+           `F-statistics` = `F`, 
+           `Sum of Squares` = SumOfSqs) %>% 
+    mutate(across(where(is.numeric), 
+                  function(x){
+                    ifelse(round(x, 3) == 0, 
+                           "< 0.001", 
+                           sprintf("%.3f", round(x, 3)))
+                    })) %>% 
     write_csv(paste0(PRM$general$dir_main_fig, "/",
                      iNameAdd, "Fig1_dbRDA_", 
                      iLvl, "_" , iNorm, ".csv"), na = "")
