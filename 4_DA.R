@@ -32,6 +32,39 @@ ResDA <- list()
 
 ResDAPlots <- list()
 
+#=============================================================================
+# Taxa summary 
+#-----------------------------------------------------------------------------
+# Will be used to construct supplementary tables 
+SummTabsLs <- list()
+
+for(i in PRM$da$tax_lvl) {
+  
+  OtuRelat <- DataLs$PS[[i]][[PRM$da$tax_summary_norm]] %>% 
+                  otu_table() %>% 
+                  as.matrix() %>% 
+                  t() %>% 
+                  as.data.frame() 
+  
+  for(j in PRM$da$strata_cols) {
+    
+    SummTabsLs[[i]][[j]] <- 
+              bind_cols(OtuRelat, DataLs$meta) %>% 
+              pivot_longer(cols = colnames(OtuRelat), 
+                           names_to = "Taxa", 
+                           values_to = "Abundance") %>% 
+              summarise(Mean = mean(Abundance), 
+                        Median = median(Abundance), 
+                        SD = sd(Abundance), 
+                        .by = all_of(c(j, PRM$general$time_point, "Taxa"))) %>% 
+              pivot_wider(id_cols = all_of(c("Taxa", j)), 
+                          names_from = all_of(c(PRM$general$time_point)), 
+                          values_from = c(Mean, Median, SD), 
+                          names_sep = " \n")
+  }
+
+}
+
 
 ################################################################################
 # MaAsLin2
@@ -71,6 +104,8 @@ for(i in 1:nrow(PrmGrid)) {
                   as.data.frame()
   
   InstResDf <- NULL
+  
+  InstSummCombDf <- NULL
   
   # Stratification
   for(j in levels(DataLs$meta[[InstStrata]])) { 
@@ -124,9 +159,29 @@ for(i in 1:nrow(PrmGrid)) {
     ResDA[[InstLvl]][[InstNorm]][[InstMaasNorm]][[InstStrata]][[j]] <- InstMaasRes
     
     InstResDf <- bind_rows(InstResDf, InstResTab)
-
+    
+    #===========================================================================
+    # Summary tables 
+    InstSummCombDf <- InstResTab %>% 
+                      select(feature, coef, stderr, pval, qval, !!sym(InstStrata)) %>% 
+                      rename(Taxa = feature, `Coef` = coef, SE = stderr, 
+                             `P-value` = pval, `Q-value` = qval) %>% 
+                      left_join(SummTabsLs[[InstLvl]][[InstStrata]], 
+                                by = c("Taxa", InstStrata)) %>% 
+                      mutate(across(where(is.numeric), function(x){round(x, 3)})) %>% 
+                      mutate(across(where(is.numeric), 
+                                    function(x){ifelse(x == 0, 
+                                                       "<0.001", 
+                                                       sprintf("%.3f", x))})) %>% 
+                      bind_rows(InstSummCombDf, .)
   }
-
+  
+  # Significant taxa names 
+  InstSigTaxa <-  InstResDf %>% 
+                      filter(!is.na(qval), 
+                             qval <= PRM$da$max_qval) %>% 
+                      pull(feature) %>% 
+                      unique()
   
   dir.create(paste0(PRM$da$dir_out, "/tabs/", InstStrata), 
              recursive = TRUE, showWarnings = FALSE)
@@ -147,11 +202,6 @@ for(i in 1:nrow(PrmGrid)) {
   # Overview plot 
   #-----------------------------------------------------------------------------
   # Plot data 
-  InstSigTaxa <-  InstResDf %>% 
-                    filter(!is.na(qval), 
-                           qval <= PRM$da$max_qval) %>% 
-                    pull(feature) %>% 
-                    unique()
   
   InstResDfFilt <- InstResDf %>% 
                         filter(feature %in% InstSigTaxa, 
@@ -229,7 +279,16 @@ for(i in 1:nrow(PrmGrid)) {
    
    ResDAPlots[[InstLvl]][[InstStrata]][[InstOutID]][["General"]] <- MaasPlotLs
    
-   
+   #----------------------------------------------------------------------------
+   # Summary tables associated with the plot (Supplementary table 3)
+   InstSummCombDf %>% 
+     filter(Taxa %in% InstSigTaxa) %>% 
+     mutate(Taxa = gsub("_", "-", fix_taxa_names_for_plot(Taxa))) %>% 
+     arrange(!!sym(InstStrata), 
+             factor(Taxa, levels = rev(levels(InstResDfFilt$feature)))) %>% 
+     write.csv(file = paste0(PRM$general$dir_main_fig, 
+                             "/Supp_DA_Tab3_", InstLvl, "_", InstStrata, ".csv"))
+     
    #----------------------------------------------------------------------------
    # Violin plot
    #----------------------------------------------------------------------------
@@ -469,7 +528,7 @@ PlotDaComb <- plot_grid(PlotMainDietPhenotype,
                   label_size = 22)
 
 save_plot(plot = PlotDaComb, 
-          filename = paste0(PRM$da$dir_out, "/MainPlot.png"), 
+          filename = paste0(PRM$general$dir_main_fig, "/Fig3_DA.png"), 
           base_height = 15, 
           base_width = 15)
 
