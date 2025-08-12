@@ -53,15 +53,20 @@ for(i in PRM$da$tax_lvl) {
               pivot_longer(cols = colnames(OtuRelat), 
                            names_to = "Taxa", 
                            values_to = "Abundance") %>% 
-              summarise(`Mean(%)` = mean(Abundance), 
-                        `Median(%)` = median(Abundance), 
-                        `SD(%)` = sd(Abundance), 
+              summarise(Mean = mean(Abundance), 
+                        Median = median(Abundance), 
+                        SD = sd(Abundance), 
+                        Iqr25 = quantile(Abundance, probs = 0.25),
+                        Iqr75 = quantile(Abundance, probs = 0.75),
                         .by = all_of(c(j, PRM$general$time_point, "Taxa"))) %>% 
-              mutate(NameCol = paste0("[", !!sym(PRM$general$time_point), "]")) %>% 
-              select(-!!sym(PRM$general$time_point)) %>% 
+              mutate(across(where(is.numeric), function(x){sprintf("%.3f", round(x, 3))})) %>% 
+              mutate(`Mean±SD(%)` = paste0(Mean, "±", SD), 
+                     `Median[IQR:25%-75%](%)` = paste0(Median, "[", Iqr25, "-", Iqr75, "]"), 
+                     NameCol = paste0("{", !!sym(PRM$general$time_point), "}")) %>% 
+              select(c(Taxa, `Mean±SD(%)`, `Median[IQR:25%-75%](%)`, NameCol, !!sym(j))) %>% 
               pivot_wider(id_cols = all_of(c("Taxa", j)), 
                           names_from = NameCol, 
-                          values_from = c(`Mean(%)`, `Median(%)`, `SD(%)`), 
+                          values_from = c(`Mean±SD(%)`, `Median[IQR:25%-75%](%)`), 
                           names_sep = " ")
   }
 
@@ -173,8 +178,10 @@ for(i in 1:nrow(PrmGrid)) {
                       mutate(across(where(is.numeric), function(x){round(x, 3)})) %>% 
                       mutate(across(where(is.numeric), 
                                     function(x){ifelse(x == 0, 
-                                                       "<0.001", 
+                                                       "< 0.001", 
                                                        sprintf("%.3f", x))})) %>% 
+                      select(all_of(c(colnames(SummTabsLs[[InstLvl]][[InstStrata]]), 
+                                      "Coef", "SE","P-value", "Q-value")))
                       bind_rows(InstSummCombDf, .)
   }
   

@@ -337,8 +337,7 @@ for(i in 1:nrow(PrmGrid)) {
                                 bottom = textGrob("Rank Metabolite"), 
                                 draw = FALSE)
     
-    ggsave(filename = paste0(PRM$corr$dir_out, 
-                             "/plots/scatter/", iType, "/Combined.svg"), 
+    ggsave(filename = paste0(PRM$general$dir_main_fig, "/Supp_Fig_Corr_", iType, ".svg"), 
            plot = CombScatter, 
            width = nrow(TextDf)*3+0.5, 
            height = nrow(SigTaxaTab)*3)
