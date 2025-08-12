@@ -229,7 +229,7 @@ for(i in PRM$alpha$strata_cols) {
              `Statsistics (W)` = statistic) %>% 
       select(-c(Variable_col, method, alternative)) %>% 
       left_join(AlphaSummary, by = c(i, "Index")) %>% 
-      select(all_of(c(colnames(AlphaSummary), colnames(.))))
+      select(all_of(c(colnames(AlphaSummary), colnames(.)))) %>% 
       write_csv(paste0(PRM$general$dir_main_fig, "/", iNameAdd, "alpha.csv"), 
                 na = "")
     
