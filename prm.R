@@ -77,7 +77,8 @@ PRM[["da"]] <- list("dir_out" ="out/da",
                     "plot_bar" = TRUE,
                     "plot_area" = FALSE,
                     "violin_ps_norm" = c("CSS", "Relative"),
-                    "bar_summary_functions" = c("median"))
+                    "bar_summary_functions" = c("median"), 
+                    "tax_summary_norm" = "Relative")
 
 
 PRM[["corr"]] <- list("dir_out" ="out/correlations",
