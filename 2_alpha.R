@@ -228,6 +228,7 @@ for(i in PRM$alpha$strata_cols) {
       rename(`P-value` = `p.value`, 
              `Statsistics (W)` = statistic) %>% 
       select(-c(Variable_col, method, alternative)) %>% 
+      mutate(across(where(is.numeric), function(x){sprintf("%.3f", round(x, 3))})) %>% 
       left_join(AlphaSummary, by = c(i, "Index")) %>% 
       select(all_of(c(colnames(AlphaSummary), colnames(.)))) %>% 
       write_csv(paste0(PRM$general$dir_main_fig, "/", iNameAdd, "alpha.csv"), 
