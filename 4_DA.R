@@ -181,7 +181,7 @@ for(i in 1:nrow(PrmGrid)) {
                                                        "< 0.001", 
                                                        sprintf("%.3f", x))})) %>% 
                       select(all_of(c(colnames(SummTabsLs[[InstLvl]][[InstStrata]]), 
-                                      "Coef", "SE","P-value", "Q-value")))
+                                      "Coef", "SE","P-value", "Q-value"))) %>% 
                       bind_rows(InstSummCombDf, .)
   }
   
