@@ -258,9 +258,25 @@ for(i in 1:nrow(PrmGrid)) {
     
     iNameAdd <- "Supp_" 
     
+    iNrow <- 2
+    
+    iNcol <- 4
+    
+    iWidth <- length(PRM$beta$distances)*PRM$beta$PlotGridColSize
+    
+    iHeight <- length(unique(DataLs$meta[[iStrata]]))*PRM$beta$PlotGridRowSize
+    
   } else {
     
     iNameAdd <- ""
+    
+    iNrow <- 1
+    
+    iNcol <- 1
+    
+    iWidth <- length(unique(DataLs$meta[[iStrata]]))*PRM$beta$PlotGridRowSize 
+    
+    iHeight <- length(PRM$beta$distances)*PRM$beta$PlotGridColSize
     
   }
   
@@ -273,11 +289,11 @@ for(i in 1:nrow(PrmGrid)) {
     
     GrobLs[[j]] <- plot_grid(plotlist = InstPlotsLs, 
                              scale = 0.975, 
-                             nrow = 1)
+                             nrow = iNrow)
   }
   
   GrobComb <- plot_grid(plotlist = GrobLs, 
-                        ncol = 1, 
+                        ncol = iNcol, 
                         labels = LETTERS[1:length(GrobLs)], 
                         label_size = 22)
   
@@ -288,8 +304,8 @@ for(i in 1:nrow(PrmGrid)) {
                               iNameAdd, "Fig1_dbRDA_", 
                               iLvl, "_" , iNorm, ".png"), 
             plot = GrobCombLeg, 
-            base_height = PRM$beta$PlotGridRowSize*length(GrobLs), 
-            base_width = PRM$beta$PlotGridColSize*length(unique(DataLs$meta[[iStrata]])))
+            base_height = iHeight, 
+            base_width = iWidth)
   
   # Statistical tables 
   ResShiftInTime[[iLvl]][[iNorm]][[iStrata]] %>% 
@@ -301,6 +317,7 @@ for(i in 1:nrow(PrmGrid)) {
            `Taxonomic Level` = Taxa_lvl, 
            Normalization = Norm_lvl, 
            `N premutations` = Permutations) %>% 
+    mutate(across(where(is.numeric), function(x){round(x, 3)})) %>% 
     write_csv(paste0(PRM$general$dir_main_fig, "/",
                      iNameAdd, "Fig1_dbRDA_", 
                      iLvl, "_" , iNorm, ".csv"), na = "")
