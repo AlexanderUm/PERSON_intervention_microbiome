@@ -53,14 +53,16 @@ for(i in PRM$da$tax_lvl) {
               pivot_longer(cols = colnames(OtuRelat), 
                            names_to = "Taxa", 
                            values_to = "Abundance") %>% 
-              summarise(Mean = mean(Abundance), 
-                        Median = median(Abundance), 
-                        SD = sd(Abundance), 
+              summarise(`Mean(%)` = mean(Abundance), 
+                        `Median(%)` = median(Abundance), 
+                        `SD(%)` = sd(Abundance), 
                         .by = all_of(c(j, PRM$general$time_point, "Taxa"))) %>% 
+              mutate(NameCol = paste0("[", !!sym(PRM$general$time_point), "]")) %>% 
+              select(-!!sym(PRM$general$time_point)) %>% 
               pivot_wider(id_cols = all_of(c("Taxa", j)), 
-                          names_from = all_of(c(PRM$general$time_point)), 
-                          values_from = c(Mean, Median, SD), 
-                          names_sep = " \n")
+                          names_from = NameCol, 
+                          values_from = c(`Mean(%)`, `Median(%)`, `SD(%)`), 
+                          names_sep = " ")
   }
 
 }
@@ -198,11 +200,10 @@ for(i in 1:nrow(PrmGrid)) {
   dir.create(paste0(PRM$da$dir_out, "/plots/", InstStrata), 
              recursive = TRUE, showWarnings = FALSE)
   
-  #-----------------------------------------------------------------------------
-  # Overview plot 
+  #=============================================================================
+  # Overview plot (Maaslin LMM)
   #-----------------------------------------------------------------------------
   # Plot data 
-  
   InstResDfFilt <- InstResDf %>% 
                         filter(feature %in% InstSigTaxa, 
                                !is.na(qval)) %>% 
@@ -289,7 +290,8 @@ for(i in 1:nrow(PrmGrid)) {
      write.csv(file = paste0(PRM$general$dir_main_fig, 
                              "/Supp_DA_Tab3_", InstLvl, "_", InstStrata, ".csv"))
      
-   #----------------------------------------------------------------------------
+   
+   #============================================================================
    # Violin plot
    #----------------------------------------------------------------------------
    for(ViolinNorm in PRM$da$violin_ps_norm) { 
@@ -391,10 +393,11 @@ for(i in 1:nrow(PrmGrid)) {
           height = ViolinPlotLs$h, 
           limitsize = FALSE)
    
-   ResDAPlots[[InstLvl]][[InstStrata]][[InstOutID]][["Volin"]][[ViolinNorm]] <- ViolinPlotLs
+   ResDAPlots[[InstLvl]][[InstStrata]][[InstOutID]][["Volin"]][[ViolinNorm]] <- 
+     ViolinPlotLs
    
    
-   #----------------------------------------------------------------------------
+   #============================================================================
    # Bar plot
    #----------------------------------------------------------------------------
    for(k in PRM$da$bar_summary_functions) { 
@@ -447,50 +450,6 @@ for(i in 1:nrow(PrmGrid)) {
        
        ResDAPlots[[InstLvl]][[InstStrata]][[InstOutID]][["Bar"]][[ViolinNorm]] <- 
          BarPlotLs
-     }
-     
-     
-     #--------------------------------------------------------------------------
-     # Area plots
-     #--------------------------------------------------------------------------
-     if(PRM$da$plot_area) {
-       
-       AreaDf <- BarDf %>% 
-                    mutate(Time = as.numeric(.data[[PRM$general$time_point]])) 
-         
-       AreaPlot <- ggplot(AreaDf, aes(y = AbundanceSummary, 
-                            x = Time, 
-                            fill = feature)) + 
-                   geom_area(stat = "identity") + 
-                   facet_grid(as.formula(paste0("~", InstStrata))) + 
-                   scale_fill_manual(values = BarTaxaColor) + 
-                   theme_classic() + 
-                   ylab(label = paste0("Abundance (", ViolinNorm, ")")) + 
-                   ggtitle(label = paste0("Summary (", k, ") of ", ViolinNorm, 
-                                          " normalized abundance at ", 
-                                          InstLvl, " taxonomic level")) + 
-                   scale_x_continuous(breaks = unique(AreaDf$Time))
-       
-       
-       # Plot dimensions 
-       AreaPlotLs <- list("plot" = AreaPlot, 
-                          "w" = length(levels(AreaDf[[InstStrata]]))*1.25 +
-                                ceiling(length(levels(BarDf$feature))/20)*2.5 + 0.2, 
-                          "h" = 5.5)
-       
-       ggsave(filename = paste0(PRM$da$dir_out, "/plots/", InstStrata, "/", 
-                                "AreaSummary(", ViolinNorm, "_", k, ")--",
-                                InstOutID, ".png"), 
-              plot = AreaPlotLs$plot, 
-              width = AreaPlotLs$w, 
-              height = AreaPlotLs$h, 
-              dpi = 600, 
-              limitsize = FALSE)
-       
-       
-       ResDAPlots[[InstLvl]][[InstStrata]][[InstOutID]][["Area"]][[ViolinNorm]] <- 
-          AreaPlotLs
-       
       }
     }
   }

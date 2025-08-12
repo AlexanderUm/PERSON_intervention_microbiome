@@ -62,7 +62,7 @@ PRM[["beta"]] <- list("dir_out" ="out/beta",
 
 
 PRM[["da"]] <- list("dir_out" ="out/da",
-                    "tax_lvl" = c("ASV", "Genus"),
+                    "tax_lvl" = c("Genus"),
                     "norm" = c("Raw"),
                     "strata_cols" = c("Diet", "DietPhenotype"),
                     "maas_method" = "ZINB",
