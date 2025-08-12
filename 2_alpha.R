@@ -203,15 +203,33 @@ for(i in PRM$alpha$strata_cols) {
            height = iHeight)
     
     
-    #---------------------------------------------------------------------------
-    # Write stat tables 
-    
+    #===========================================================================
+    # Write stat tables with summary 
+    AlphaSummary <- AlphaDfLong %>% 
+      summarise(Mean = mean(value), 
+                Median = median(value), 
+                SD = sd(value), 
+                Iqr25 = quantile(value, probs = 0.25),
+                Iqr75 = quantile(value, probs = 0.75),
+                .by = all_of(c(i, PRM$general$time_point, "Index"))) %>% 
+      mutate(across(where(is.numeric), function(x){sprintf("%.3f", round(x, 3))})) %>% 
+      mutate(`Mean±SD(%)` = paste0(Mean, "±", SD), 
+             `Median[IQR:25%-75%](%)` = paste0(Median, "[", Iqr25, "-", Iqr75, "]"), 
+             NameCol = paste0("{", !!sym(PRM$general$time_point), "}")) %>% 
+      select(c(Index, `Mean±SD(%)`, `Median[IQR:25%-75%](%)`, NameCol, !!sym(i))) %>% 
+      pivot_wider(id_cols = all_of(c("Index", i)), 
+                  names_from = NameCol, 
+                  values_from = c(`Mean±SD(%)`, `Median[IQR:25%-75%](%)`), 
+                  names_sep = " ")
+      
+    # Combine summary and statistical results 
     lapply(ShiftTestRes[[i]], function(x) {add_row(x)}) %>% 
       bind_rows() %>% 
       rename(`P-value` = `p.value`, 
-             Strata = !!sym(i), 
              `Statsistics (W)` = statistic) %>% 
-      select(-c(Variable_col, method)) %>% 
+      select(-c(Variable_col, method, alternative)) %>% 
+      left_join(AlphaSummary, by = c(i, "Index")) %>% 
+      select(all_of(c(colnames(AlphaSummary), colnames(.))))
       write_csv(paste0(PRM$general$dir_main_fig, "/", iNameAdd, "alpha.csv"), 
                 na = "")
     
