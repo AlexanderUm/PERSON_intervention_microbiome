@@ -19,7 +19,7 @@ PRM[["general"]] <- list("seed" = 3894568,
                                       "qiime2R", "ggsignif", "broom", 
                                       "vegan", "cowplot", 
                                       "ComplexHeatmap", "FSA", "usedist", 
-                                      "Maaslin2", "pROC", "gridExtra", "rstatix"))
+                                      "Maaslin2", "pROC", "gridExtra"))
 
 
 PRM[["data"]] <- list("q_path" = "data/", 
