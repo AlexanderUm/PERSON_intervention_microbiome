@@ -64,7 +64,7 @@ for(i in 1:nrow(PrmGird)) {
 PrmGirdShiftInTime <- expand.grid("Tax_lvl" = PRM$beta$tax_lvl, 
                                   "Normal" = PRM$beta$norm, 
                                   "Strata" = PRM$beta$strata_cols, 
-                                  "TestFormula" = PRM$beta$formula,
+                                  "TestFormula" = names(PRM$beta$formula),
                                   "Distance" = names(PRM$beta$distances), 
                                   stringsAsFactors = FALSE)
 ResShiftInTime <- list()
@@ -79,7 +79,9 @@ for(i in 1:nrow(PrmGirdShiftInTime)) {
   
   iStrata <- PrmGirdShiftInTime[i, "Strata"]
   
-  iFormula <- PrmGirdShiftInTime[i, "TestFormula"]
+  iFromList <- PRM$beta$formula[[PrmGirdShiftInTime[i, "TestFormula"]]]
+  
+  iFormula <- iFromList[["form"]]
   
   iDistName <- PrmGirdShiftInTime[i, "Distance"]
   
@@ -95,11 +97,14 @@ for(i in 1:nrow(PrmGirdShiftInTime)) {
     jDistMatrix <- dist_subset(DistsLs[[iLvl]][[iNorm]][[iDistName]], 
                             rownames(jMeta))
     
+    # Adjust permutation schime 
+    jPermSchime <- gsub("meta", "jMeta",PRM$beta$perm_schime)
+    
     # Run adonis2 
     jResAdon <- adonis2(formula = as.formula(paste0("jDistMatrix ~ ", iFormula)), 
                        data = jMeta, 
                        by = "terms", 
-                       permutations = PRM$beta$n_perm, 
+                       permutations = eval(parse(text = jPermSchime)), 
                        parallel = 4) %>% 
                   as.data.frame() %>% 
                   mutate(across(everything(), 
@@ -110,9 +115,27 @@ for(i in 1:nrow(PrmGirdShiftInTime)) {
                          Strata_lvl = j,
                          Taxa_lvl = iLvl,
                          Norm_lvl = iNorm,
-                         Permutations = PRM$beta$n_perm,
+                         Permutations = jPermSchime,
                          Formula = paste0("iDist ~ ", iFormula)) %>% 
                   add_row()
+    
+    #---------------------------------------------------------------------------
+    # Rev 1 - add dispersion test 
+    #---------------------------------------------------------------------------
+    jDisper <- betadisper(jDistMatrix, 
+                          group = as.factor(jMeta[[iFromList[["disp_group"]]]]))
+    
+    JDisperPerm <- permutest(jDisper, 
+                             permutations = eval(parse(text = jPermSchime))) 
+    
+    
+    # Add data about dispersion p-values 
+    JDisperPermTab <- JDisperPerm$tab[1, c("F", "Pr(>F)")] %>% 
+                            setNames(c("Dispersion - F", "Dispersion - P")) %>% 
+                            mutate(Term = iFromList[["disp_group"]])
+    
+    jResAdon <- left_join(jResAdon, JDisperPermTab, by = "Term")
+    #---------------------------------------------------------------------------
     
     # Collect and write out data
     ResShiftInTimeDf <- bind_rows(ResShiftInTimeDf, jResAdon)
