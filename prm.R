@@ -12,14 +12,15 @@ PRM[["general"]] <- list("seed" = 3894568,
                           "seq_id_col" = "SeqID", 
                           "diet_col" = "Diet", 
                           "penothype_col" = "Phenotype",
-                          "dir_out" = "out", 
-                          "dir_main_fig" = "out/figures_main", 
-                          "dir_Rdata" = "out/Rdata",
+                          "dir_out" = "out_rev1", 
+                          "dir_main_fig" = "out_rev1/figures_main", 
+                          "dir_Rdata" = "out_rev1/Rdata",
                           "libs" =  c("phyloseq", "tidyverse", "metagenomeSeq", 
                                       "qiime2R", "ggsignif", "broom", 
                                       "vegan", "cowplot", 
                                       "ComplexHeatmap", "FSA", "usedist", 
-                                      "Maaslin2", "pROC", "gridExtra"))
+                                      "Maaslin2", "pROC", "gridExtra", 
+                                      "DivNet", "ANCOMBC"))
 
 
 PRM[["data"]] <- list("q_path" = "data/", 
@@ -29,7 +30,7 @@ PRM[["data"]] <- list("q_path" = "data/",
                       "new_cols" = list("DietPhenotype" = c("Diet", "Phenotype")))
 
 
-PRM[["alpha"]] <- list("dir_out" = "out/alpha",
+PRM[["alpha"]] <- list("dir_out" = "out_rev1/alpha",
                        "measures" = c("Observed", "Shannon",
                                       "InvSimpson", "PhyloDiversity"),
                         "tax_lvl" = "ASV",
@@ -39,16 +40,17 @@ PRM[["alpha"]] <- list("dir_out" = "out/alpha",
                         "alpha_cut_kw" = 0.05)
 
 
-PRM[["beta"]] <- list("dir_out" ="out/beta", 
+PRM[["beta"]] <- list("dir_out" ="out_rev1/beta", 
                       "tax_lvl" = c("ASV"),
                       "norm" = "CSS",
                       "distances" = c("Unweighted UniFrac" = "unifrac",
                                       "Weighted UniFrac" = "wunifrac",
                                       "Jaccard" = "jaccard",
                                       "Bray-Curtis" = "bray"),
-                      "n_perm" = 999,
+                      "perm_schime" = "how(blocks = meta$ID, nperm = 9999)",
                       "strata_cols" = c("Diet", "DietPhenotype"),
-                      "formula" = "ID + TimeNumeric",
+                      "formula" = list("f1" = c("form" = "TimeNumeric", 
+                                                "disp_group" = "TimeNumeric")),
                       "rda_plot_formula" = "ID + TimeNumeric",
                       "rda_plot_group" = "Time",
                       "rda_plot_strata" = c("Diet", "DietPhenotype"),
@@ -61,7 +63,7 @@ PRM[["beta"]] <- list("dir_out" ="out/beta",
                        "out_dir_path" = "out/beta")
 
 
-PRM[["da"]] <- list("dir_out" ="out/da",
+PRM[["da"]] <- list("dir_out" ="out_rev1/da",
                     "tax_lvl" = c("Genus"),
                     "norm" = c("Raw"),
                     "strata_cols" = c("Diet", "DietPhenotype"),
@@ -72,7 +74,7 @@ PRM[["da"]] <- list("dir_out" ="out/da",
                     "maas_norm" = c("TMM"),
                     "maas_trans" = "NONE",
                     "col_prev_by" = "DietPhenotype",
-                    "min_prev" = c(0.5),
+                    "min_prev" = c(0.25, 0.5),
                     "max_qval" = 0.1,
                     "plot_bar" = TRUE,
                     "plot_area" = FALSE,
@@ -81,7 +83,7 @@ PRM[["da"]] <- list("dir_out" ="out/da",
                     "tax_summary_norm" = "Relative")
 
 
-PRM[["corr"]] <- list("dir_out" ="out/correlations",
+PRM[["corr"]] <- list("dir_out" ="out_rev1/correlations",
                       "tax_lvl" = c("Genus"),
                       "norm" = c("CSS"),
                       "strata_cols" = c("Diet", "DietPhenotype"),
