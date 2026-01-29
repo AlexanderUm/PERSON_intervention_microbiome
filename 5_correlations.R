@@ -228,11 +228,9 @@ for(i in 1:nrow(PrmGrid)) {
                            "w" = ncol(HeatDfs$estimate)*0.4 + 5, 
                            "h" = nrow(HeatDfs$estimate)*0.25 + 2)
     
-    png(filename =  paste0(PRM$corr$dir_out, "/plots/Heat_", iNameAdd, ".png"), 
+    svg(filename =  paste0(PRM$corr$dir_out, "/plots/Heat_", iNameAdd, ".svg"), 
         width = CorrHeatPlotLs$w, 
-        height = CorrHeatPlotLs$h, 
-        units = "in", 
-        res = 600)
+        height = CorrHeatPlotLs$h)
     
     draw(CorrHeatPlotLs$plot)
     
@@ -424,13 +422,11 @@ for(i in 1:nrow(PrmGrid)) {
   
   
   # Write out results 
-  png(filename = paste0(PRM$general$dir_main_fig, 
+  svg(filename = paste0(PRM$general$dir_main_fig, 
                         "/Fig5_CorrHeat_", 
-                        paste(PrmGrid[i, ], collapse = "_"), ".png"), 
+                        paste(PrmGrid[i, ], collapse = "_"), ".svg"), 
       width = (ncol(iDfEst)*0.4 + 2.5), 
-      height = (nrow(iDfEst)*0.25 + 2.5), 
-      units = "in", 
-      res = 600)
+      height = (nrow(iDfEst)*0.25 + 2.5))
   
   draw(iHeat, heatmap_legend_side = "bottom")
   
@@ -439,6 +435,6 @@ for(i in 1:nrow(PrmGrid)) {
 }
 #-------------------------------------------------------------------------------
 
-# Clean environment 
+# Clean environment
 rm(list = ls())
 gc()
