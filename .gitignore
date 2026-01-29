@@ -11,6 +11,7 @@
 # Directories 
 data/
 out/ 
+out*/
 manuscript/
 
 # Test files
