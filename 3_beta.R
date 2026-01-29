@@ -250,7 +250,7 @@ for(i in 1:nrow(PrmGirdRda)) {
       # Save individual plots 
       ggsave(filename = paste0(PRM$beta$dir_out, "/plots/", 
                                iStrata, "/",j, "/",
-                               "/dbRDA--", iLvl, "_", iNorm, "--", k, ".png"), 
+                               "/dbRDA--", iLvl, "_", iNorm, "--", k, ".svg"), 
              plot = jRdaPlot$Ind[[k]], width = 5.5, height = 3.5, dpi = 500)
       
     }
@@ -325,7 +325,7 @@ for(i in 1:nrow(PrmGrid)) {
   
   save_plot(filename = paste0(PRM$general$dir_main_fig, "/",
                               iNameAdd, "Fig1_dbRDA_", 
-                              iLvl, "_" , iNorm, ".png"), 
+                              iLvl, "_" , iNorm, ".svg"), 
             plot = GrobCombLeg, 
             base_height = iHeight, 
             base_width = iWidth)
