@@ -94,7 +94,7 @@ for(i in 1:nrow(IterGrid)) {
                   tidy() %>% 
                   mutate(!!iVar := j) %>% 
                   bind_rows(ResWl, .) 
-      
+    
     }
     
     ShiftTestRes[[iVar]][[iInd]] <- ResWl %>% 
@@ -103,8 +103,8 @@ for(i in 1:nrow(IterGrid)) {
   }
   
 ResAlpha[["Tables"]][["Stat_shift"]] <-  ShiftTestRes
-  
-  
+
+
 #-----------------------------------------------------------------------------
 # Plot the data
 #-----------------------------------------------------------------------------
@@ -197,7 +197,7 @@ for(i in PRM$alpha$strata_cols) {
                             p.height = iHeight)
     
     # Save plots 
-    ggsave(paste0(PRM$general$dir_main_fig, "/", iNameAdd, "alpha.png"), 
+    ggsave(paste0(PRM$general$dir_main_fig, "/", iNameAdd, "alpha.svg"), 
            plot = iPlot, 
            width = iWidth, 
            height = iHeight)
@@ -235,6 +235,144 @@ for(i in PRM$alpha$strata_cols) {
                 na = "")
     
 }
+
+
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Rev 1 - addition of DivNet alpha diversity estimation 
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+nTaxaToTest <- 3000
+
+StrataCols <- PRM$alpha$strata_cols
+
+DivNetRes <- c()
+
+for(i in StrataCols) {
+  
+  for(j in levels(DataLs$meta[[i]])) {
+    
+    jMeta <- DataLs$meta %>% 
+                  filter(!!sym(i) == j) %>% 
+                  mutate(sample_names = SeqID)
+    
+    jPs <-  prune_samples(rownames(jMeta), DataLs$PS$Genus$Raw)
+    
+    
+    # Filter taxa to increase computational efficiency 
+    jTaxaKeep <- taxa_sums(jPs) %>% 
+                     .[. != 0]
+    
+    if(length(jTaxaKeep) > nTaxaToTest) {
+      
+      jTaxaKeep <- jTaxaKeep %>% 
+                      sort(decreasing = TRUE) %>% 
+                      .[1:nTaxaToTest] 
+    }
+    
+    jPs <-  prune_taxa(names(jTaxaKeep),  jPs)
+    
+    # Run divnet 
+    jDivNetRes <- divnet(jPs)
+    
+    # Statistical test 
+    for(k in c("shannon", "simpson")) {
+      
+      kCombTab <- left_join(jMeta, 
+                            summary(jDivNetRes[[k]]), 
+                            by = "sample_names")
+      
+      kStatRes <- betta_random(formula = estimate ~ TimeNumeric | ID, 
+                               ses = error,  
+                               data = kCombTab, 
+                               p.digits = 10)
+      
+      DivNetRes <- kStatRes$table %>% 
+                      as.data.frame() %>% 
+                      mutate(Strata_Column = i, 
+                             Strata_Level = j, 
+                             Index = k, 
+                             Term = rownames(.)) %>% 
+                      bind_rows(DivNetRes, .)
+    }
+    
+  }
+  
+}
+
+#-------------------------------------------------------------------------------
+# Make a forest plot (DA template)
+#-------------------------------------------------------------------------------
+# Data prep 
+DivNetResForm <- DivNetRes %>% 
+                    mutate(stderr = `Standard Errors`, 
+                           pval_char = ifelse(round(`p-values`, 3) == 0, "p>0.001", 
+                                              paste0("p=", round(`p-values`, 3))), 
+                           Index = str_to_title(Index), 
+                           Strata_Column = gsub("DietPhenotype", 
+                                                "Diet-Phenotype", 
+                                                Strata_Column), 
+                           Alpha = ifelse(`p-values` <= 0.05, 
+                                          "P-value \u2264 0.05", 
+                                          "P-value > 0.05")) %>% 
+                    filter(Term != "(Intercept)")  
+
+AlphaColor <- c("P-value \u2264 0.05" = "black", 
+                "P-value > 0.05" = "gray") 
+
+LimX <- (max(abs(DivNetResForm$Estimates))*1.2 + max(DivNetResForm$stderr))
+
+
+# Plot 
+DivNetPlot <- ggplot(DivNetResForm, 
+                     aes(x = Estimates, 
+                         y = Strata_Level, 
+                         colour = Alpha)) + 
+                      geom_errorbar(aes(xmin = Estimates - stderr, 
+                                        xmax = Estimates + stderr), 
+                                    size=0.75, width=0.15) + 
+                      geom_vline(xintercept = 0, 
+                                 alpha = 0.75, 
+                                 color = "gray", 
+                                 size = 0.75) + 
+                      geom_point(size = 3.5) + 
+                      geom_text(aes(label = pval_char), 
+                                vjust = -1, 
+                                fontface = "italic", 
+                                size = 2.5, 
+                                show.legend = FALSE) +
+                      facet_grid(Strata_Column ~ Index, 
+                                 scales = "free_y", 
+                                 space = "free") + 
+                      theme_bw() +
+                      ylab("Strata") + 
+                      xlab("Estimate") +
+                      scale_color_manual(values = AlphaColor) +
+                      theme(panel.grid.major.x = element_blank(),
+                            panel.grid.minor.x = element_blank(), 
+                            axis.text.y = element_text(size = 10, 
+                                                       family = "serif", 
+                                                       color = "black"),
+                            legend.title = element_blank(), 
+                            axis.text.x = element_text(angle = 45, hjust = 1), 
+                            strip.text.y = element_text(size = 10, 
+                                                        family = "serif", 
+                                                        color = "black")) +
+                      scale_x_continuous(limits = c(-LimX, LimX))
+
+# Save plots 
+ggsave(paste0(PRM$general$dir_main_fig, "/DivNet_alpha.svg"), 
+       plot = DivNetPlot, 
+       width = 7, 
+       height = 3.5)
+
+
+# Corresponding statistical table
+DivNetResForm %>% 
+  select(Term, Estimates, `Standard Errors`, `p-values`, 
+         Strata_Column, Strata_Level, Index) %>% 
+  write.csv(paste0(PRM$general$dir_main_fig, "/DivNet_alpha.csv"), 
+            row.names = FALSE)
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 # Clean environment 
