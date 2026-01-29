@@ -230,53 +230,75 @@ for(i in 1:nrow(PrmGrid)) {
                                                                  PRM$da$max_qval), 
                                                           paste0("Q-value > ", 
                                                                  PRM$da$max_qval)))))
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  # Rev 1. Add separation for 0.05 & 0.1 q-values 
+  #-----------------------------------------------------------------------------
+  InstResDfFilt <- InstResDfFilt %>% 
+                        select(feature, qval) %>% 
+                        summarise(Min_Qval = min(qval),.by = feature) %>% 
+                        mutate(Qval_split = ifelse(Min_Qval > 0.05, 
+                                                   "Q-value \u2264 0.1", 
+                                                   "Q-value \u2264 0.05")) %>% 
+                        select(feature, Qval_split) %>% 
+                        left_join(InstResDfFilt, ., by = "feature") 
+  
+  FeatureLvls <- InstResDfFilt %>% 
+                        slice_max(abs(coef), n=1, by = "feature") %>% 
+                        group_by(Qval_split) %>% 
+                        arrange(coef) %>% 
+                        pull(feature) %>% 
+                        as.character()
+  
+  InstResDfFilt <- InstResDfFilt %>% 
+                        mutate(feature = factor(feature, levels = FeatureLvls))
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
   # Plot accessories
-   AlphaColor <- c("gray", "black") %>% 
-                    setNames(c(paste0("Q-value > ", PRM$da$max_qval), 
-                               paste0("Q-value", " \u2264 ", PRM$da$max_qval)))
-   
-   LimX <- (max(abs(InstResDfFilt$coef)) + max(InstResDfFilt$stderr))
+  AlphaColor <- c("gray", "black") %>% 
+                  setNames(c(paste0("Q-value > ", PRM$da$max_qval), 
+                             paste0("Q-value", " \u2264 ", PRM$da$max_qval)))
+                
+  LimX <- (max(abs(InstResDfFilt$coef)) + max(InstResDfFilt$stderr))
   
-   # Plot itself 
-   MaasPlot <- ggplot(InstResDfFilt, 
-                           aes(x = coef, 
-                               y = feature, 
-                               color = Alpha)) + 
-                geom_errorbar(aes(xmin = coef - stderr, 
-                                  xmax = coef + stderr), 
-                             size=0.75, width=0.15) + 
-                geom_vline(xintercept = 0, 
-                           alpha = 0.75, 
-                           color = "gray", 
-                           size = 0.75) + 
-                geom_point(size = 3.5) + 
-                geom_text(aes(label = qval_char), 
-                          vjust = -1, 
-                          fontface = "italic", 
-                          size = 2.5, 
-                          show.legend = FALSE) +
-                facet_grid(as.formula(paste0("~", InstStrata)), 
-                           scales = "free_y", 
-                           space = "free") + 
-                theme_bw() +
-                theme(panel.grid.major.x = element_blank(),
-                      panel.grid.minor.x = element_blank(), 
-                      axis.text.y = element_text(face = "italic", 
-                                                 size = 12, 
-                                                 family = "serif", 
-                                                 color = "black")) +
-                ylab("") + 
-                xlab("") +
-                scale_color_manual(values = AlphaColor) + 
-                theme(legend.text = element_text(size=12),
-                      legend.title = element_text(size=15), 
-                      axis.text.x = element_text(angle = 45, hjust = 1)) +
-               scale_x_continuous(limits = c(-LimX, LimX))
-   
-   MaasPlotLs <- list("plot" = MaasPlot, 
-                      "w" = length(levels(DataLs$meta[[InstStrata]]))*2.75 + 2.5, 
-                      "h" = length(InstSigTaxa)*0.275 + 1.5)
+  # Plot itself 
+  MaasPlot <- ggplot(InstResDfFilt, 
+                     aes(x = coef, 
+                         y = feature, 
+                         color = Alpha)) + 
+    geom_errorbar(aes(xmin = coef - stderr, 
+                      xmax = coef + stderr), 
+                  size=0.75, width=0.15) + 
+    geom_vline(xintercept = 0, 
+               alpha = 0.75, 
+               color = "gray", 
+               size = 0.75) + 
+    geom_point(size = 3.5) + 
+    geom_text(aes(label = qval_char), 
+              vjust = -1, 
+              fontface = "italic", 
+              size = 2.5, 
+              show.legend = FALSE) +
+    facet_grid(as.formula(paste0("Qval_split", "~", InstStrata)), 
+               scales = "free_y", 
+               space = "free") + 
+    theme_bw() +
+    theme(panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank(), 
+          axis.text.y = element_text(face = "italic", 
+                                     size = 12, 
+                                     family = "serif", 
+                                     color = "black")) +
+    ylab("") + 
+    xlab("") +
+    scale_color_manual(values = AlphaColor) + 
+    theme(legend.text = element_text(size=12),
+          legend.title = element_text(size=15), 
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_continuous(limits = c(-LimX, LimX))
+  
+  MaasPlotLs <- list("plot" = MaasPlot, 
+                     "w" = length(levels(DataLs$meta[[InstStrata]]))*2.75 + 2.5, 
+                     "h" = length(InstSigTaxa)*0.275 + 1.5)
    
    ggsave(paste0(PRM$da$dir_out, "/plots/", InstStrata, "/", "MaasLin--", 
                  InstOutID, ".png"), 
@@ -290,14 +312,14 @@ for(i in 1:nrow(PrmGrid)) {
    #----------------------------------------------------------------------------
    # Summary tables associated with the plot (Supplementary table 3)
    InstSummCombDf %>% 
-     filter(Taxa %in% InstSigTaxa) %>% 
-     mutate(Taxa = gsub("_", "-", fix_taxa_names_for_plot(Taxa))) %>% 
-     arrange(!!sym(InstStrata), 
-             factor(Taxa, levels = rev(levels(InstResDfFilt$feature)))) %>% 
-     write.csv(file = paste0(PRM$general$dir_main_fig, 
-                             "/Supp_DA_Tab3_", InstLvl, "_", InstStrata, ".csv"))
+         filter(Taxa %in% InstSigTaxa) %>% 
+         mutate(Taxa = gsub("_", "-", fix_taxa_names_for_plot(Taxa))) %>% 
+         arrange(!!sym(InstStrata), 
+                 factor(Taxa, levels = rev(levels(InstResDfFilt$feature)))) %>% 
+         write.csv(file = paste0(PRM$general$dir_main_fig, 
+                                 "/Supp_DA_Tab3_", 
+                                 InstLvl, "_", InstStrata, "_", InstMinPrev, ".csv"))
      
-   
    #============================================================================
    # Violin plot
    #----------------------------------------------------------------------------
@@ -472,31 +494,51 @@ save(list = c("ResDAPlots", "ResDA"),
 ################################################################################
 # Combine plots into a panel for publication 
 #-------------------------------------------------------------------------------
-PlotMainDiet <- ResDAPlots$Genus$Diet[[1]]$General$plot + 
-                  theme(legend.position = "none")
+DaMainPrm <- list("Taxa_Lvl"= "Genus", 
+                  "Prev_Cut" = PRM$da$min_prev)
 
-PlotMainDietPhenotype <- 
-          ResDAPlots$Genus$DietPhenotype[[1]]$General$plot + 
-          theme(legend.position = "none")
+DaMainPrm <- expand.grid(DaMainPrm, stringsAsFactors = FALSE)
 
-PlotBarRelatDietPhenotype <- 
-          ResDAPlots$Genus$DietPhenotype[[1]]$Bar$Relative$plot + 
-          guides(fill = guide_legend(ncol = 1))
-
-PlotDaComb <- plot_grid(PlotMainDietPhenotype, 
-                  plot_grid(PlotBarRelatDietPhenotype, NULL, PlotMainDiet, 
-                            rel_widths = c(0.5, 0.005, 0.6), 
-                            labels = c("B", "", "C"), 
-                            nrow = 1, 
-                            label_size = 22), 
-                  ncol = 1, 
-                  labels = c("A", ""), 
-                  label_size = 22)
-
-save_plot(plot = PlotDaComb, 
-          filename = paste0(PRM$general$dir_main_fig, "/Fig3_DA.png"), 
-          base_height = 15, 
-          base_width = 15)
+for(i in 1:nrow(DaMainPrm)) {
+  
+  iTestId <- names(ResDAPlots[[DaMainPrm$Taxa_Lvl[[i]]]][[1]]) %>% 
+    grep(DaMainPrm$Prev_Cut[[i]], . , value = TRUE)
+  
+  iLvl <- DaMainPrm$Taxa_Lvl[[i]]
+  
+  
+  PlotMainDiet <- ResDAPlots[[iLvl]]$Diet[[iTestId]]$General$plot + 
+    theme(legend.position = "none")
+  
+  PlotMainDietPhenotype <- 
+    ResDAPlots[[iLvl]]$DietPhenotype[[iTestId]]$General$plot + 
+    theme(legend.position = "none")
+  
+  PlotBarRelatDietPhenotype <- 
+    ResDAPlots[[iLvl]]$DietPhenotype[[iTestId]]$Bar$Relative$plot + 
+    guides(fill = guide_legend(ncol = 1))
+  
+  PlotDaComb <- plot_grid(PlotMainDietPhenotype, 
+                          plot_grid(PlotBarRelatDietPhenotype, NULL, PlotMainDiet, 
+                                    rel_widths = c(0.5, 0.005, 0.6), 
+                                    labels = c("B", "", "C"), 
+                                    nrow = 1, 
+                                    label_size = 22), 
+                          ncol = 1, 
+                          labels = c("A", ""), 
+                          label_size = 22)
+  
+  iPlotSize <- max(ResDAPlots[[iLvl]]$Diet[[iTestId]]$General$h,  
+                   ResDAPlots[[iLvl]]$DietPhenotype[[iTestId]]$General$h)
+  
+  save_plot(plot = PlotDaComb, 
+            filename = paste0(PRM$general$dir_main_fig, 
+                              "/Fig3_DA_", 
+                              DaMainPrm$Prev_Cut[[i]],".svg"), 
+            base_height = iPlotSize*2, 
+            base_width = iPlotSize*2*0.75)
+  
+}
 
 # Clean environment 
 rm(list = ls())
